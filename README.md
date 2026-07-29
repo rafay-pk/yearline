@@ -50,7 +50,7 @@ Yearline stores its data locally in SQLite. No internet connection or online acc
 
 ### Windows installer
 
-1. Open the repository's Releases page.
+1. Open the repository's [Releases](https://github.com/rafay-pk/yearline/releases) page.
 2. Download the latest Yearline installer.
 3. Run the installer.
 4. Launch Yearline from the Start menu or desktop shortcut.

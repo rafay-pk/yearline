@@ -2,6 +2,7 @@ import calendarIcon from "./assets/calendar.svg";
 import {
   FormEvent,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState
@@ -203,6 +204,102 @@ function setDragPayload(
   event.dataTransfer.setData(
     "text/plain",
     serializedPayload
+  );
+}
+
+interface ChecklistTextEditorProps {
+  item: ChecklistItem;
+  onSave: (input: {
+    id: number;
+    text: string;
+  }) => void | Promise<void>;
+}
+
+function ChecklistTextEditor({
+  item,
+  onSave
+}: ChecklistTextEditorProps) {
+  const [text, setText] = useState(item.text);
+
+  const textareaRef =
+    useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    setText(item.text);
+  }, [item.id, item.text]);
+
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+
+    if (!textarea) {
+      return;
+    }
+
+    /*
+      Reset the height first so the textarea can
+      also shrink when text is removed.
+    */
+    textarea.style.height = "0px";
+    textarea.style.height =
+      `${textarea.scrollHeight}px`;
+  }, [text]);
+
+  function saveText(): void {
+    const nextText = text.trim();
+
+    if (!nextText) {
+      setText(item.text);
+      return;
+    }
+
+    setText(nextText);
+
+    if (nextText !== item.text) {
+      void onSave({
+        id: item.id,
+        text: nextText
+      });
+    }
+  }
+
+  return (
+    <textarea
+      ref={textareaRef}
+      className={[
+        "checklist-textarea",
+        item.isDone
+          ? "checklist-textarea-complete"
+          : ""
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      rows={1}
+      value={text}
+      aria-label="Checklist task"
+      onChange={(event) =>
+        setText(event.target.value)
+      }
+      onBlur={saveText}
+      onKeyDown={(event) => {
+        /*
+          Enter remains available for intentional
+          line breaks. Ctrl+Enter saves the task.
+        */
+        if (
+          event.key === "Enter" &&
+          (event.ctrlKey || event.metaKey)
+        ) {
+          event.preventDefault();
+          event.currentTarget.blur();
+        }
+
+        if (event.key === "Escape") {
+          event.preventDefault();
+          setText(item.text);
+          event.currentTarget.blur();
+        }
+      }}
+    />
   );
 }
 
@@ -3666,23 +3763,9 @@ function MilestoneEditor({
                     }
                   />
 
-                  <input
-                    className="checklist-text"
-                    defaultValue={item.text}
-                    onBlur={(event) => {
-                      const text =
-                        event.target.value.trim();
-
-                      if (
-                        text &&
-                        text !== item.text
-                      ) {
-                        void onUpdateChecklistItem({
-                          id: item.id,
-                          text
-                        });
-                      }
-                    }}
+                  <ChecklistTextEditor
+                    item={item}
+                    onSave={onUpdateChecklistItem}
                   />
 
                   <button
