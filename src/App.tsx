@@ -1174,67 +1174,93 @@ export default function App() {
     };
   }, []);
 
+  const shouldClosePanelRef = useRef(false);
+
   useEffect(() => {
     if (!selection) {
+      shouldClosePanelRef.current = false;
       return;
     }
 
-    function handleOutsideClick(
-      event: MouseEvent
+    function handlePointerDown(
+      event: PointerEvent
     ): void {
       const target = event.target;
 
-      if (!(target instanceof Element)) {
-        return;
-      }
-
-      const panel = document.querySelector(
-        ".side-panel"
-      );
-
-      if (panel?.contains(target)) {
+      if (!(target instanceof Node)) {
+        shouldClosePanelRef.current = false;
         return;
       }
 
       /*
-        Elements that open another panel manage the
-        selection themselves. Do not close the newly
-        opened panel afterward.
+        This runs before any button's onClick changes
+        the selected right-side panel.
       */
-      if (
-        target.closest(
+      const panel = document.querySelector(
+        ".side-panel"
+      );
+
+      const element =
+        target instanceof Element
+          ? target
+          : target.parentElement;
+
+      const opensAnotherPanel =
+        element?.closest(
           '[data-panel-trigger="true"]'
-        )
-      ) {
-        return;
+        ) !== null;
+
+      shouldClosePanelRef.current = Boolean(
+        panel &&
+        !panel.contains(target) &&
+        !opensAnotherPanel
+      );
+    }
+
+    function handleDocumentClick(): void {
+      /*
+        The input blur event has already happened by
+        this point, so automatic saving can complete
+        before the panel is unmounted.
+      */
+      if (shouldClosePanelRef.current) {
+        setSelection(null);
       }
 
-      setSelection(null);
+      shouldClosePanelRef.current = false;
     }
 
     function handleEscape(
       event: KeyboardEvent
     ): void {
-      if (event.key === "Escape") {
-        const activeElement =
-          document.activeElement;
-
-        if (
-          activeElement instanceof HTMLElement &&
-          document
-            .querySelector(".side-panel")
-            ?.contains(activeElement)
-        ) {
-          activeElement.blur();
-        }
-
-        setSelection(null);
+      if (event.key !== "Escape") {
+        return;
       }
+
+      const activeElement =
+        document.activeElement;
+
+      if (
+        activeElement instanceof HTMLElement &&
+        document
+          .querySelector(".side-panel")
+          ?.contains(activeElement)
+      ) {
+        activeElement.blur();
+      }
+
+      setSelection(null);
     }
 
     document.addEventListener(
+      "pointerdown",
+      handlePointerDown,
+      true
+    );
+
+    document.addEventListener(
       "click",
-      handleOutsideClick
+      handleDocumentClick
     );
 
     window.addEventListener(
@@ -1244,8 +1270,14 @@ export default function App() {
 
     return () => {
       document.removeEventListener(
+        "pointerdown",
+        handlePointerDown,
+        true
+      );
+
+      document.removeEventListener(
         "click",
-        handleOutsideClick
+        handleDocumentClick
       );
 
       window.removeEventListener(
@@ -2658,6 +2690,8 @@ function DateEditor({
                 }) => (
                   <button
                     key={`${project.id}-${milestone.id}-${milestoneIndex}`}
+                    type="button"
+                    date-panel-navigation="true"
                     className="milestone-list-item"
                     onClick={() =>
                       onSelect({
@@ -2707,6 +2741,8 @@ function DateEditor({
                 (specialDate) => (
                   <button
                     key={specialDate.id}
+                    type="button"
+                    date-panel-navigation="true"
                     className="milestone-list-item"
                     onClick={() =>
                       onSelect({
@@ -3877,6 +3913,8 @@ function PanelHeader({
       <div>
         {onBack && (
           <button
+            type="button"
+            data-panel-navigation="true"
             className="back-button"
             onClick={onBack}
           >
