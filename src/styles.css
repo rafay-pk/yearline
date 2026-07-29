@@ -708,7 +708,7 @@ textarea:focus-visible {
   z-index: 100;
   display: flex;
   flex-direction: column;
-  width: 390px;
+  width: 500px;
   max-width: 92vw;
   border-left: 1px solid var(--border);
   background: var(--surface);
@@ -1481,7 +1481,7 @@ button:disabled {
 
 .color-palette {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(8, 1fr);
   gap: 7px;
 }
 

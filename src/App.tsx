@@ -48,18 +48,32 @@ import "./styles.css";
 const DAY_MS = 86_400_000;
 
 const COLORS = [
-  "#6C63FF",
+  "#FF4D4D",
   "#FF6B6B",
-  "#00A896",
-  "#F4A261",
-  "#3A86FF",
-  "#E056FD",
-  "#2A9D8F",
+  "#FF84BA",
   "#F72585",
+  "#B11226",
   "#8338EC",
+  "#E056FD",
+  "#3A86FF",
+  
+  "#FBBC04",
+  "#F4A261",
+  "#EBD5AB",
   "#FB8500",
+  "#5C2A1D",
+  "#6C63FF",
+  "#836ca7",
+  "#38BDF8",
+  
+  "#00A896",
   "#219EBC",
-  "#8AC926"
+  "#99DDCC",
+  "#8AC926",
+  "#063B00",
+  "#3949AB",
+  "#8C9097",
+  "#1C262B",
 ];
 
 const WEEKDAYS = [
@@ -3260,10 +3274,6 @@ function ProjectEditor({
               placeholder="Add project notes…"
             />
           </Field>
-
-          <p className="autosave-message">
-            Changes save automatically.
-          </p>
         </div>
 
         <section className="panel-section">
@@ -3878,10 +3888,6 @@ function MilestoneEditor({
               {formatLongDate(endDate)}
             </span>
           </Field>
-
-          <p className="autosave-message">
-            Changes save automatically.
-          </p>
         </div>
 
         <section className="panel-section">
@@ -4258,10 +4264,6 @@ function SpecialDateEditor({
               }}
             />
           </Field>
-
-          <p className="autosave-message">
-            Changes save automatically.
-          </p>
         </div>
 
         <button
