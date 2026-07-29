@@ -63,13 +63,12 @@ file and repository before continuing.
 A demonstration dataset can be imported to populate Yearline with sample
 projects, milestones, checklists, and highlighted dates.
 
-1. Download or copy `demo/yearline-demo-data.json`.
+1. Download [demo-data.json](https://github.com/rafay-pk/yearline/blob/main/demo-data.json)
 2. Open Yearline.
 3. Select **Import**.
 4. Select the demonstration JSON file.
 
-Importing data replaces the current Yearline database. Export a backup before
-importing when necessary.
+Importing data replaces the current Yearline database. Export a backup before importing when necessary.
 
 ## Development
 

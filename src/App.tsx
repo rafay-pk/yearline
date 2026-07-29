@@ -38,7 +38,8 @@ import {
   updateMilestone,
   updateProject,
   updateSpecialDate,
-  splitMilestoneAtDate
+  splitMilestoneAtDate,
+  reorderChecklistItems
 } from "./data";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 
@@ -2105,6 +2106,13 @@ async function handleDateDrop(
             setSelection(null);
           })
         }
+        onReorderChecklistItems={(input) =>
+          commitAction(
+            "Reordered checklist tasks",
+            () =>
+              reorderChecklistItems(input)
+          )
+        }
       />
     </div>
   );
@@ -2985,14 +2993,16 @@ interface SidePanelProps {
     specialDate: SpecialDate
   ) => Promise<void>;
   activity: ActivityEntry[];
-
   onCreateProjectFromDate: (
     date: string
   ) => void;
-
   onAddSpecialDate: (
     date: string
   ) => void;
+  onReorderChecklistItems: (input: {
+  milestoneId: number;
+  orderedItemIds: number[];
+}) => void | Promise<void>;
 }
 
 function SidePanel({
@@ -3013,7 +3023,8 @@ function SidePanel({
   onUpdateChecklistItem,
   onDeleteChecklistItem,
   onSaveSpecialDate,
-  onDeleteSpecialDate
+  onDeleteSpecialDate,
+  onReorderChecklistItems
 }: SidePanelProps) {
   if (!selection) {
     return null;
@@ -3068,6 +3079,9 @@ function SidePanel({
         }
         onDeleteChecklistItem={
           onDeleteChecklistItem
+        }
+          onReorderChecklistItems={
+          onReorderChecklistItems
         }
       />
     );
@@ -3448,6 +3462,10 @@ interface MilestoneEditorProps {
   onDeleteChecklistItem: (
     item: ChecklistItem
   ) => Promise<void>;
+  onReorderChecklistItems: (input: {
+    milestoneId: number;
+    orderedItemIds: number[];
+  }) => void | Promise<void>;
 }
 
 function MilestoneEditor({
@@ -3458,7 +3476,8 @@ function MilestoneEditor({
   onDelete,
   onAddChecklistItem,
   onUpdateChecklistItem,
-  onDeleteChecklistItem
+  onDeleteChecklistItem,
+  onReorderChecklistItems
 }: MilestoneEditorProps) {
   const {
     project,
@@ -3504,6 +3523,144 @@ function MilestoneEditor({
             milestone.checklist.length
           ) * 100
         );
+
+  const [
+    orderedChecklist,
+    setOrderedChecklist
+  ] = useState<ChecklistItem[]>(() =>
+    [...milestone.checklist].sort(
+      (first, second) =>
+        first.position - second.position
+    )
+  );
+
+  const [
+    draggedChecklistItemId,
+    setDraggedChecklistItemId
+  ] = useState<number | null>(null);
+
+  const [
+    dragOverChecklistItemId,
+    setDragOverChecklistItemId
+  ] = useState<number | null>(null);
+
+  const orderedChecklistRef =
+    useRef<ChecklistItem[]>(
+      orderedChecklist
+    );
+
+  const originalChecklistOrderRef =
+    useRef<ChecklistItem[]>([]);
+
+  const checklistDropCompletedRef =
+    useRef(false);
+
+  useEffect(() => {
+    const nextChecklist = [
+      ...milestone.checklist
+    ].sort(
+      (first, second) =>
+        first.position - second.position
+    );
+
+    setOrderedChecklist(nextChecklist);
+    orderedChecklistRef.current =
+      nextChecklist;
+  }, [
+    milestone.id,
+    milestone.checklist
+  ]);
+
+  function moveChecklistItem(
+    draggedItemId: number,
+    targetItemId: number
+  ): void {
+    if (draggedItemId === targetItemId) {
+      return;
+    }
+
+    setOrderedChecklist((current) => {
+      const fromIndex = current.findIndex(
+        (item) =>
+          item.id === draggedItemId
+      );
+
+      const targetIndex = current.findIndex(
+        (item) =>
+          item.id === targetItemId
+      );
+
+      if (
+        fromIndex === -1 ||
+        targetIndex === -1
+      ) {
+        return current;
+      }
+
+      const next = [...current];
+
+      const [movedItem] = next.splice(
+        fromIndex,
+        1
+      );
+
+      next.splice(
+        targetIndex,
+        0,
+        movedItem
+      );
+
+      const positionedItems = next.map(
+        (item, position) => ({
+          ...item,
+          position
+        })
+      );
+
+      orderedChecklistRef.current =
+        positionedItems;
+
+      return positionedItems;
+    });
+  }
+
+  async function saveChecklistOrder(): Promise<void> {
+    const currentOrder =
+      orderedChecklistRef.current;
+
+    const originalIds =
+      originalChecklistOrderRef.current.map(
+        (item) => item.id
+      );
+
+    const currentIds =
+      currentOrder.map(
+        (item) => item.id
+      );
+
+    const orderChanged =
+      originalIds.length ===
+        currentIds.length &&
+      originalIds.some(
+        (id, index) =>
+          id !== currentIds[index]
+      );
+
+    checklistDropCompletedRef.current =
+      true;
+
+    setDraggedChecklistItemId(null);
+    setDragOverChecklistItemId(null);
+
+    if (!orderChanged) {
+      return;
+    }
+
+    await onReorderChecklistItems({
+      milestoneId: milestone.id,
+      orderedItemIds: currentIds
+    });
+  }
 
   async function submitChecklist(
     event: FormEvent
@@ -3739,49 +3896,193 @@ function MilestoneEditor({
             </div>
           </div>
 
-          <div className="checklist">
-            {milestone.checklist.map(
-              (item) => (
-                <div
-                  key={item.id}
-                  className={[
-                    "checklist-item",
-                    item.isDone
-                      ? "checklist-item-done"
-                      : ""
-                  ].join(" ")}
+          <div
+            className="checklist-list"
+            onDragOver={(event) => {
+              if (
+                draggedChecklistItemId !== null
+              ) {
+                event.preventDefault();
+                event.dataTransfer.dropEffect =
+                  "move";
+              }
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              void saveChecklistOrder();
+            }}
+          >
+            {orderedChecklist.map((item) => (
+              <div
+                key={item.id}
+                draggable
+                className={[
+                  "checklist-item",
+                  item.isDone
+                    ? "checklist-item-complete"
+                    : "",
+                  draggedChecklistItemId ===
+                  item.id
+                    ? "checklist-item-dragging"
+                    : "",
+                  dragOverChecklistItemId ===
+                    item.id &&
+                  draggedChecklistItemId !==
+                    item.id
+                    ? "checklist-item-drag-over"
+                    : ""
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                onDragStart={(event) => {
+                  const target =
+                    event.target as HTMLElement;
+
+                  /*
+                    Preserve normal interaction with the
+                    checkbox, textarea and delete button.
+                  */
+                  if (
+                    target.closest(
+                      "input, textarea, button, a"
+                    )
+                  ) {
+                    event.preventDefault();
+                    return;
+                  }
+
+                  originalChecklistOrderRef.current =
+                    [...orderedChecklistRef.current];
+
+                  checklistDropCompletedRef.current =
+                    false;
+
+                  setDraggedChecklistItemId(
+                    item.id
+                  );
+
+                  event.dataTransfer.effectAllowed =
+                    "move";
+
+                  event.dataTransfer.setData(
+                    "text/plain",
+                    String(item.id)
+                  );
+                }}
+                onDragEnter={(event) => {
+                  if (
+                    draggedChecklistItemId ===
+                      null ||
+                    draggedChecklistItemId ===
+                      item.id
+                  ) {
+                    return;
+                  }
+
+                  event.preventDefault();
+
+                  setDragOverChecklistItemId(
+                    item.id
+                  );
+
+                  moveChecklistItem(
+                    draggedChecklistItemId,
+                    item.id
+                  );
+                }}
+                onDragOver={(event) => {
+                  if (
+                    draggedChecklistItemId !==
+                    null
+                  ) {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect =
+                      "move";
+                  }
+                }}
+                onDragLeave={(event) => {
+                  const nextTarget =
+                    event.relatedTarget;
+
+                  if (
+                    nextTarget instanceof Node &&
+                    event.currentTarget.contains(
+                      nextTarget
+                    )
+                  ) {
+                    return;
+                  }
+
+                  if (
+                    dragOverChecklistItemId ===
+                    item.id
+                  ) {
+                    setDragOverChecklistItemId(
+                      null
+                    );
+                  }
+                }}
+                onDragEnd={() => {
+                  /*
+                    Restore the original order when the drag
+                    is cancelled or released outside the list.
+                  */
+                  if (
+                    !checklistDropCompletedRef.current
+                  ) {
+                    const originalOrder =
+                      originalChecklistOrderRef.current;
+
+                    setOrderedChecklist(
+                      originalOrder
+                    );
+
+                    orderedChecklistRef.current =
+                      originalOrder;
+                  }
+
+                  setDraggedChecklistItemId(null);
+                  setDragOverChecklistItemId(null);
+
+                  checklistDropCompletedRef.current =
+                    false;
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={item.isDone}
+                  aria-label={`Mark ${item.text} as complete`}
+                  onChange={(event) =>
+                    void onUpdateChecklistItem({
+                      id: item.id,
+                      isDone:
+                        event.target.checked
+                    })
+                  }
+                />
+
+                <ChecklistTextEditor
+                  item={item}
+                  onSave={
+                    onUpdateChecklistItem
+                  }
+                />
+
+                <button
+                  type="button"
+                  className="checklist-delete-button"
+                  title="Delete task"
+                  aria-label={`Delete ${item.text}`}
+                  onClick={() =>
+                    void onDeleteChecklistItem(
+                      item
+                    )
+                  }
                 >
-                  <input
-                    type="checkbox"
-                    checked={item.isDone}
-                    onChange={(event) =>
-                      void onUpdateChecklistItem({
-                        id: item.id,
-                        isDone:
-                          event.target.checked
-                      })
-                    }
-                  />
-
-                  <ChecklistTextEditor
-                    item={item}
-                    onSave={onUpdateChecklistItem}
-                  />
-
-                  <button
-                    className="remove-item-button"
-                    onClick={() =>
-                      void onDeleteChecklistItem(
-                        item
-                      )
-                    }
-                    aria-label="Delete checklist item"
-                  >
-                    ×
-                  </button>
-                </div>
-              )
-            )}
+                  ×
+                </button>
+              </div>
+            ))}
           </div>
 
           <form

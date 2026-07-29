@@ -863,3 +863,46 @@ export async function splitMilestoneAtDate(
 
   return Number(result.lastInsertId);
 }
+
+export async function reorderChecklistItems(input: {
+  milestoneId: number;
+  orderedItemIds: number[];
+}): Promise<void> {
+  const { milestoneId, orderedItemIds } = input;
+
+  if (orderedItemIds.length === 0) {
+    return;
+  }
+
+  const db = await getDatabase();
+
+  const positionCases = orderedItemIds
+    .map(
+      (_, index) =>
+        `WHEN $${index + 2} THEN ${index}`
+    )
+    .join("\n");
+
+  const itemPlaceholders = orderedItemIds
+    .map((_, index) => `$${index + 2}`)
+    .join(", ");
+
+  await db.execute(
+    `
+      UPDATE checklist_items
+      SET
+        position = CASE id
+          ${positionCases}
+          ELSE position
+        END,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE
+        milestone_id = $1
+        AND id IN (${itemPlaceholders})
+    `,
+    [
+      milestoneId,
+      ...orderedItemIds
+    ]
+  );
+}
