@@ -1,0 +1,543 @@
+{
+  "app": "Yearline",
+  "format": "yearline",
+  "version": 1,
+  "formatVersion": 1,
+  "schemaVersion": 1,
+  "exportedAt": "2026-07-29T08:25:00.000Z",
+  "data": {
+    "projects": [
+      {
+        "id": 1,
+        "title": "Launch Yearline 1.0",
+        "emoji": "🚀",
+        "notes": "Prepare the first public release, documentation, screenshots, installer, and launch materials.",
+        "position": 0,
+        "milestones": [
+          {
+            "id": 101,
+            "projectId": 1,
+            "title": "Product definition",
+            "startDate": "2026-01-05",
+            "endDate": "2026-02-06",
+            "color": "#6C63FF",
+            "position": 0,
+            "checklist": [
+              {
+                "id": 1001,
+                "milestoneId": 101,
+                "text": "Finalize the core feature list",
+                "isDone": true,
+                "position": 0
+              },
+              {
+                "id": 1002,
+                "milestoneId": 101,
+                "text": "Confirm the year-view layout",
+                "isDone": true,
+                "position": 1
+              },
+              {
+                "id": 1003,
+                "milestoneId": 101,
+                "text": "Define the import and export format",
+                "isDone": true,
+                "position": 2
+              }
+            ]
+          },
+          {
+            "id": 102,
+            "projectId": 1,
+            "title": "Interface polish",
+            "startDate": null,
+            "endDate": "2026-04-17",
+            "color": "#3A86FF",
+            "position": 1,
+            "checklist": [
+              {
+                "id": 1004,
+                "milestoneId": 102,
+                "text": "Finish the light and dark themes",
+                "isDone": true,
+                "position": 0
+              },
+              {
+                "id": 1005,
+                "milestoneId": 102,
+                "text": "Add the project emoji picker",
+                "isDone": true,
+                "position": 1
+              },
+              {
+                "id": 1006,
+                "milestoneId": 102,
+                "text": "Refine timeline connectors",
+                "isDone": true,
+                "position": 2
+              }
+            ]
+          },
+          {
+            "id": 103,
+            "projectId": 1,
+            "title": "Release candidate",
+            "startDate": null,
+            "endDate": "2026-07-24",
+            "color": "#00A896",
+            "position": 2,
+            "checklist": [
+              {
+                "id": 1007,
+                "milestoneId": 103,
+                "text": "Complete the Windows installer test",
+                "isDone": true,
+                "position": 0
+              },
+              {
+                "id": 1008,
+                "milestoneId": 103,
+                "text": "Verify database migrations",
+                "isDone": true,
+                "position": 1
+              },
+              {
+                "id": 1009,
+                "milestoneId": 103,
+                "text": "Capture the GitHub cover image",
+                "isDone": false,
+                "position": 2
+              }
+            ]
+          },
+          {
+            "id": 104,
+            "projectId": 1,
+            "title": "Public launch",
+            "startDate": null,
+            "endDate": "2026-09-04",
+            "color": "#8AC926",
+            "position": 3,
+            "checklist": [
+              {
+                "id": 1010,
+                "milestoneId": 104,
+                "text": "Publish version 1.0.0",
+                "isDone": false,
+                "position": 0
+              },
+              {
+                "id": 1011,
+                "milestoneId": 104,
+                "text": "Write the release notes",
+                "isDone": false,
+                "position": 1
+              },
+              {
+                "id": 1012,
+                "milestoneId": 104,
+                "text": "Publish the GitHub repository",
+                "isDone": false,
+                "position": 2
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Studio Website Refresh",
+        "emoji": "🎨",
+        "notes": "Redesign the studio website with clearer case studies, a stronger portfolio, and improved conversion paths.",
+        "position": 1,
+        "milestones": [
+          {
+            "id": 201,
+            "projectId": 2,
+            "title": "Research and content audit",
+            "startDate": "2026-03-02",
+            "endDate": "2026-04-10",
+            "color": "#F72585",
+            "position": 0,
+            "checklist": [
+              {
+                "id": 2001,
+                "milestoneId": 201,
+                "text": "Audit the existing pages",
+                "isDone": true,
+                "position": 0
+              },
+              {
+                "id": 2002,
+                "milestoneId": 201,
+                "text": "Collect stakeholder feedback",
+                "isDone": true,
+                "position": 1
+              },
+              {
+                "id": 2003,
+                "milestoneId": 201,
+                "text": "Define the new content structure",
+                "isDone": true,
+                "position": 2
+              }
+            ]
+          },
+          {
+            "id": 202,
+            "projectId": 2,
+            "title": "Design system",
+            "startDate": null,
+            "endDate": "2026-06-12",
+            "color": "#E056FD",
+            "position": 1,
+            "checklist": [
+              {
+                "id": 2004,
+                "milestoneId": 202,
+                "text": "Approve typography and spacing",
+                "isDone": true,
+                "position": 0
+              },
+              {
+                "id": 2005,
+                "milestoneId": 202,
+                "text": "Design reusable components",
+                "isDone": true,
+                "position": 1
+              },
+              {
+                "id": 2006,
+                "milestoneId": 202,
+                "text": "Prepare responsive layouts",
+                "isDone": true,
+                "position": 2
+              }
+            ]
+          },
+          {
+            "id": 203,
+            "projectId": 2,
+            "title": "Development sprint",
+            "startDate": null,
+            "endDate": "2026-08-07",
+            "color": "#8338EC",
+            "position": 2,
+            "checklist": [
+              {
+                "id": 2007,
+                "milestoneId": 203,
+                "text": "Implement portfolio pages",
+                "isDone": true,
+                "position": 0
+              },
+              {
+                "id": 2008,
+                "milestoneId": 203,
+                "text": "Connect the inquiry form",
+                "isDone": false,
+                "position": 1
+              },
+              {
+                "id": 2009,
+                "milestoneId": 203,
+                "text": "Run an accessibility review",
+                "isDone": false,
+                "position": 2
+              }
+            ]
+          },
+          {
+            "id": 204,
+            "projectId": 2,
+            "title": "Launch and measure",
+            "startDate": null,
+            "endDate": "2026-10-02",
+            "color": "#FB8500",
+            "position": 3,
+            "checklist": [
+              {
+                "id": 2010,
+                "milestoneId": 204,
+                "text": "Deploy the production website",
+                "isDone": false,
+                "position": 0
+              },
+              {
+                "id": 2011,
+                "milestoneId": 204,
+                "text": "Configure analytics",
+                "isDone": false,
+                "position": 1
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Mobile App Prototype",
+        "emoji": "📱",
+        "notes": "Design and test an offline-first mobile companion app for reviewing project milestones.",
+        "position": 2,
+        "milestones": [
+          {
+            "id": 301,
+            "projectId": 3,
+            "title": "User-flow planning",
+            "startDate": "2026-05-11",
+            "endDate": "2026-06-19",
+            "color": "#219EBC",
+            "position": 0,
+            "checklist": [
+              {
+                "id": 3001,
+                "milestoneId": 301,
+                "text": "Map the primary user journeys",
+                "isDone": true,
+                "position": 0
+              },
+              {
+                "id": 3002,
+                "milestoneId": 301,
+                "text": "Define offline behavior",
+                "isDone": true,
+                "position": 1
+              }
+            ]
+          },
+          {
+            "id": 302,
+            "projectId": 3,
+            "title": "Interactive prototype",
+            "startDate": null,
+            "endDate": "2026-07-31",
+            "color": "#2A9D8F",
+            "position": 1,
+            "checklist": [
+              {
+                "id": 3003,
+                "milestoneId": 302,
+                "text": "Create the calendar screen",
+                "isDone": true,
+                "position": 0
+              },
+              {
+                "id": 3004,
+                "milestoneId": 302,
+                "text": "Prototype project details",
+                "isDone": false,
+                "position": 1
+              },
+              {
+                "id": 3005,
+                "milestoneId": 302,
+                "text": "Test the navigation flow",
+                "isDone": false,
+                "position": 2
+              }
+            ]
+          },
+          {
+            "id": 303,
+            "projectId": 3,
+            "title": "Usability testing",
+            "startDate": null,
+            "endDate": "2026-09-11",
+            "color": "#F4A261",
+            "position": 2,
+            "checklist": [
+              {
+                "id": 3006,
+                "milestoneId": 303,
+                "text": "Recruit five test participants",
+                "isDone": false,
+                "position": 0
+              },
+              {
+                "id": 3007,
+                "milestoneId": 303,
+                "text": "Document usability findings",
+                "isDone": false,
+                "position": 1
+              }
+            ]
+          },
+          {
+            "id": 304,
+            "projectId": 3,
+            "title": "Prototype handoff",
+            "startDate": null,
+            "endDate": "2026-11-06",
+            "color": "#FF6B6B",
+            "position": 3,
+            "checklist": [
+              {
+                "id": 3008,
+                "milestoneId": 304,
+                "text": "Prepare implementation notes",
+                "isDone": false,
+                "position": 0
+              },
+              {
+                "id": 3009,
+                "milestoneId": 304,
+                "text": "Present the final prototype",
+                "isDone": false,
+                "position": 1
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Team Knowledge Base",
+        "emoji": "📚",
+        "notes": "Organize internal processes, templates, onboarding material, and engineering documentation.",
+        "position": 3,
+        "milestones": [
+          {
+            "id": 401,
+            "projectId": 4,
+            "title": "Information architecture",
+            "startDate": "2026-07-01",
+            "endDate": "2026-07-31",
+            "color": "#8AC926",
+            "position": 0,
+            "checklist": [
+              {
+                "id": 4001,
+                "milestoneId": 401,
+                "text": "Define the top-level categories",
+                "isDone": true,
+                "position": 0
+              },
+              {
+                "id": 4002,
+                "milestoneId": 401,
+                "text": "Assign documentation owners",
+                "isDone": false,
+                "position": 1
+              },
+              {
+                "id": 4003,
+                "milestoneId": 401,
+                "text": "Create article templates",
+                "isDone": false,
+                "position": 2
+              }
+            ]
+          },
+          {
+            "id": 402,
+            "projectId": 4,
+            "title": "Content migration",
+            "startDate": null,
+            "endDate": "2026-10-16",
+            "color": "#00A896",
+            "position": 1,
+            "checklist": [
+              {
+                "id": 4004,
+                "milestoneId": 402,
+                "text": "Move onboarding guides",
+                "isDone": false,
+                "position": 0
+              },
+              {
+                "id": 4005,
+                "milestoneId": 402,
+                "text": "Archive outdated documents",
+                "isDone": false,
+                "position": 1
+              }
+            ]
+          },
+          {
+            "id": 403,
+            "projectId": 4,
+            "title": "Team rollout",
+            "startDate": null,
+            "endDate": "2026-11-27",
+            "color": "#6C63FF",
+            "position": 2,
+            "checklist": [
+              {
+                "id": 4006,
+                "milestoneId": 403,
+                "text": "Host a team walkthrough",
+                "isDone": false,
+                "position": 0
+              },
+              {
+                "id": 4007,
+                "milestoneId": 403,
+                "text": "Collect improvement requests",
+                "isDone": false,
+                "position": 1
+              }
+            ]
+          },
+          {
+            "id": 404,
+            "projectId": 4,
+            "title": "Documentation review",
+            "startDate": null,
+            "endDate": "2026-12-18",
+            "color": "#3A86FF",
+            "position": 3,
+            "checklist": [
+              {
+                "id": 4008,
+                "milestoneId": 404,
+                "text": "Review documentation coverage",
+                "isDone": false,
+                "position": 0
+              },
+              {
+                "id": 4009,
+                "milestoneId": 404,
+                "text": "Publish the maintenance schedule",
+                "isDone": false,
+                "position": 1
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "specialDates": [
+      {
+        "id": 9001,
+        "date": "2026-01-05",
+        "label": "Annual planning kickoff",
+        "color": "#FFD166"
+      },
+      {
+        "id": 9002,
+        "date": "2026-04-17",
+        "label": "Interface design review",
+        "color": "#E056FD"
+      },
+      {
+        "id": 9003,
+        "date": "2026-07-24",
+        "label": "Yearline release candidate",
+        "color": "#00A896"
+      },
+      {
+        "id": 9004,
+        "date": "2026-09-04",
+        "label": "Yearline 1.0 launch",
+        "color": "#8AC926"
+      },
+      {
+        "id": 9005,
+        "date": "2026-12-18",
+        "label": "Annual planning workshop",
+        "color": "#F72585"
+      }
+    ]
+  }
+}
