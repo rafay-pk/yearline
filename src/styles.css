@@ -1628,6 +1628,24 @@ button:disabled {
   cursor: pointer;
 }
 
+.date-milestone-actions {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  width: 100%;
+  gap: 8px;
+}
+
+.date-milestone-actions .secondary-button {
+  width: 100%;
+  min-height: 50px;
+  height: 100%;
+  padding: 8px 10px;
+  line-height: 1.25;
+  white-space: normal;
+}
+
 .legend-emoji {
   display: inline-grid;
   place-items: center;

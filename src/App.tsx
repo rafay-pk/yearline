@@ -38,7 +38,7 @@ import {
   updateMilestone,
   updateProject,
   updateSpecialDate,
-  splitMilestoneAtDate,
+  insertMilestoneAtDate,
   reorderChecklistItems
 } from "./data";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -199,6 +199,10 @@ interface ActivityEntry {
   timestamp: string;
   type: "action" | "undo" | "redo";
 }
+
+type MilestoneInsertionPlacement =
+  | "before"
+  | "after";
 
 function setDragPayload(
   event: React.DragEvent<HTMLElement>,
@@ -1111,7 +1115,8 @@ export default function App() {
 
   async function handleAddMilestoneToProject(
     projectId: number,
-    date: string
+    date: string,
+    placement: MilestoneInsertionPlacement
   ): Promise<void> {
     const currentSnapshot =
       await loadSnapshot();
@@ -1142,12 +1147,15 @@ export default function App() {
       milestone
     } = choice;
 
-    const oldEndDate = milestone.endDate;
-
     const newEndDate =
-      compareDates(oldEndDate, date) > 0
-        ? oldEndDate
-        : addDays(date, 14);
+      placement === "before"
+        ? date
+        : compareDates(
+              milestone.endDate,
+              date
+            ) > 0
+          ? milestone.endDate
+          : addDays(date, 14);
 
     const newColor =
       COLORS[
@@ -1161,23 +1169,30 @@ export default function App() {
     let createdMilestoneId = 0;
 
     await commitAction(
-      `Added milestone to "${project.title}" on ${formatLongDate(
+      `Inserted milestone ${
+        placement === "before"
+          ? "before"
+          : "after"
+      } "${milestone.title}" on ${formatLongDate(
         date
       )}`,
       async () => {
         createdMilestoneId =
-          await splitMilestoneAtDate({
+          await insertMilestoneAtDate({
             projectId: project.id,
             sourceMilestoneId:
               milestone.id,
             sourcePosition:
               milestone.position,
+            sourceStartDate:
+              milestone.startDate,
             splitDate: date,
             newEndDate,
             newTitle: `Milestone ${
               project.milestones.length + 1
             }`,
-            newColor
+            newColor,
+            placement
           });
       }
     );
@@ -2042,11 +2057,13 @@ async function handleDateDrop(
         }
         onAddMilestoneToProject={(
           projectId,
-          date
+          date,
+          placement
         ) =>
           void handleAddMilestoneToProject(
             projectId,
-            date
+            date,
+            placement
           )
         }
         onSaveMilestone={(input) =>
@@ -2649,7 +2666,8 @@ interface DateEditorProps {
   onAddSpecialDate: (date: string) => void;
   onAddMilestoneToProject: (
     projectId: number,
-    date: string
+    date: string,
+    placement: MilestoneInsertionPlacement
   ) => void;
 }
 
@@ -2684,6 +2702,17 @@ function DateEditor({
         )
       : ""
   );
+
+  const selectedProjectChoice =
+    projectChoices.find(
+      ({ project }) =>
+        String(project.id) ===
+        selectedProjectId
+    ) ?? projectChoices[0];
+
+  const selectedMilestoneTitle =
+    selectedProjectChoice?.milestone.title ??
+    "selected milestone";
 
   const specialDates =
     snapshot.specialDates.filter(
@@ -2753,27 +2782,55 @@ function DateEditor({
                   )}
                 </select>
 
-                <button
-                  type="button"
-                  className="secondary-button full-width"
-                  disabled={!selectedProjectId}
-                  onClick={() => {
-                    const projectId = Number(
-                      selectedProjectId
-                    );
-
-                    if (
-                      Number.isFinite(projectId)
-                    ) {
-                      onAddMilestoneToProject(
-                        projectId,
-                        date
+                <div className="date-milestone-actions">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    disabled={!selectedProjectId}
+                    onClick={() => {
+                      const projectId = Number(
+                        selectedProjectId
                       );
-                    }
-                  }}
-                >
-                  + Insert milestone on this date
-                </button>
+
+                      if (
+                        Number.isFinite(projectId)
+                      ) {
+                        onAddMilestoneToProject(
+                          projectId,
+                          date,
+                          "before"
+                        );
+                      }
+                    }}
+                  >
+                    + Add new milestone before{" "}
+                    {selectedMilestoneTitle}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    disabled={!selectedProjectId}
+                    onClick={() => {
+                      const projectId = Number(
+                        selectedProjectId
+                      );
+
+                      if (
+                        Number.isFinite(projectId)
+                      ) {
+                        onAddMilestoneToProject(
+                          projectId,
+                          date,
+                          "after"
+                        );
+                      }
+                    }}
+                  >
+                    + Add new milestone after{" "}
+                    {selectedMilestoneTitle}
+                  </button>
+                </div>
               </>
             ) : (
               <p className="panel-empty-message">
@@ -2972,7 +3029,8 @@ interface SidePanelProps {
   ) => void;
   onAddMilestoneToProject: (
     projectId: number,
-    date: string
+    date: string,
+    placement: MilestoneInsertionPlacement
   ) => void;
   onSaveMilestone: (input: {
     id: number;

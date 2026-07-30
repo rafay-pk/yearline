@@ -776,18 +776,99 @@ export async function replaceSnapshot(
   }
 }
 
-export async function splitMilestoneAtDate(
+export async function insertMilestoneAtDate(
   input: {
     projectId: number;
     sourceMilestoneId: number;
     sourcePosition: number;
+    sourceStartDate: string | null;
     splitDate: string;
     newEndDate: string;
     newTitle: string;
     newColor: string;
+    placement: "before" | "after";
   }
 ): Promise<number> {
   const db = await getDatabase();
+
+  if (
+    input.placement === "before" &&
+    input.sourcePosition === 0 &&
+    !input.sourceStartDate
+  ) {
+    throw new Error(
+      "The first milestone does not have a start date."
+    );
+  }
+
+  if (input.placement === "before") {
+    /*
+      The new milestone takes the source milestone's
+      position. When inserting before the first
+      milestone, it also takes the project's explicit
+      start date; the former first milestone then
+      starts implicitly at the new milestone's end.
+    */
+    await db.execute(
+      `
+        UPDATE milestones
+        SET
+          position = position + 1,
+          start_date = CASE
+            WHEN id = $3 THEN NULL
+            ELSE start_date
+          END,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE
+          project_id = $1
+          AND position >= $2
+      `,
+      [
+        input.projectId,
+        input.sourcePosition,
+        input.sourceMilestoneId
+      ]
+    );
+
+    const result = await db.execute(
+      `
+        INSERT INTO milestones (
+          project_id,
+          title,
+          start_date,
+          end_date,
+          color,
+          position
+        )
+        VALUES (
+          $1,
+          $2,
+          $3,
+          $4,
+          $5,
+          $6
+        )
+      `,
+      [
+        input.projectId,
+        input.newTitle,
+        input.sourcePosition === 0
+          ? input.sourceStartDate
+          : null,
+        input.newEndDate,
+        input.newColor,
+        input.sourcePosition
+      ]
+    );
+
+    if (result.lastInsertId === undefined) {
+      throw new Error(
+        "The new milestone ID was not returned."
+      );
+    }
+
+    return Number(result.lastInsertId);
+  }
 
   /*
     Make room after the milestone being split.
