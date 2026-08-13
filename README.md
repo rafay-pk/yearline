@@ -1,6 +1,6 @@
 <p align="center">
   <img
-    src="docs/yearline-cover.png"
+    src="docs/yearline-cover.webp"
     alt="Yearline displaying a complete year of projects and milestones"
     width="100%"
   />
