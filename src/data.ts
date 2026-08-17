@@ -1,5 +1,7 @@
 import Database from "@tauri-apps/plugin-sql";
 
+export const MAX_CHECKLIST_DEPTH = 4;
+
 export interface ChecklistItem {
   id: number;
   milestoneId: number;
@@ -727,16 +729,46 @@ export function parseImportPayload(value: unknown): AppSnapshot {
                   const requestedParentId =
                     parentByItemId.get(item.id) ?? null;
 
-                  const parentIsRoot =
-                    requestedParentId !== null &&
-                    requestedParentId !== item.id &&
-                    parentByItemId.has(requestedParentId) &&
-                    parentByItemId.get(requestedParentId) ===
+                  let depth = 0;
+                  let parentId = requestedParentId;
+                  let parentChainIsValid = true;
+                  const visitedIds = new Set<number>([
+                    item.id
+                  ]);
+
+                  while (parentId !== null) {
+                    if (
+                      !parentByItemId.has(parentId) ||
+                      visitedIds.has(parentId)
+                    ) {
+                      parentChainIsValid = false;
+                      parentId = null;
+                      break;
+                    }
+
+                    visitedIds.add(parentId);
+                    depth += 1;
+
+                    if (depth > MAX_CHECKLIST_DEPTH) {
+                      parentChainIsValid = false;
+                      parentId = null;
+                      break;
+                    }
+
+                    parentId =
+                      parentByItemId.get(parentId) ??
                       null;
+                  }
+
+                  const parentIsValid =
+                    requestedParentId !== null &&
+                    parentChainIsValid &&
+                    depth > 0 &&
+                    depth <= MAX_CHECKLIST_DEPTH;
 
                   return {
                     ...item,
-                    parentId: parentIsRoot
+                    parentId: parentIsValid
                       ? requestedParentId
                       : null
                   };

@@ -53,8 +53,7 @@
     -18px 0 55px rgba(0, 0, 0, 0.45);
 }
 
-.font-select,
-.project-filter-select {
+.font-select {
   max-width: 138px;
   min-height: 36px;
   padding: 0 9px;
@@ -68,19 +67,11 @@
   font-weight: 650;
 }
 
-.project-filter-select {
-  width: 150px;
-  max-width: 18vw;
-  font-size: 11px;
-}
-
-.font-select:hover,
-.project-filter-select:hover {
+.font-select:hover {
   background: var(--surface-hover);
 }
 
-.font-select option,
-.project-filter-select option {
+.font-select option {
   background: var(--surface);
   color: var(--text);
 }
@@ -363,20 +354,82 @@ select:focus-visible {
 .legend-project {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
   flex: 0 0 auto;
   min-height: 27px;
-  padding: 0 9px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: transparent;
-  cursor: pointer;
   font-size: 11px;
   font-weight: 650;
+  transition:
+    opacity 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease;
 }
 
 .legend-project:hover {
   background: var(--surface-hover);
+}
+
+.legend-project-selected {
+  border-color: var(--project-accent);
+  box-shadow:
+    0 0 0 1px var(--project-accent);
+}
+
+.legend-project-dimmed {
+  opacity: 0.42;
+}
+
+.legend-project-dimmed:hover,
+.legend-project-dimmed:focus-within {
+  opacity: 0.78;
+}
+
+.legend-project-visibility,
+.legend-project-details {
+  min-height: 25px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.legend-project-visibility {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  border-radius: 999px;
+}
+
+.legend-project-details {
+  max-width: 190px;
+  padding: 0 9px 0 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.legend-project-eye {
+  display: none;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.legend-project-visibility:hover .legend-emoji,
+.legend-project-visibility:focus-visible .legend-emoji,
+.legend-project-selected .legend-emoji {
+  display: none;
+}
+
+.legend-project-visibility:hover .legend-project-eye,
+.legend-project-visibility:focus-visible .legend-project-eye,
+.legend-project-selected .legend-project-eye {
+  display: inline;
 }
 
 .legend-color {
@@ -1100,7 +1153,6 @@ button:disabled {
   grid-template-columns:
     auto
     minmax(0, 1fr)
-    auto
     auto;
   align-items: start;
   gap: 9px;
@@ -1119,11 +1171,8 @@ button:disabled {
 
 .checklist-subtask {
   position: relative;
-  grid-template-columns:
-    auto
-    minmax(0, 1fr)
-    auto;
-  margin-left: 25px;
+  margin-left:
+    calc(var(--checklist-depth) * 16px);
   background:
     color-mix(
       in srgb,
@@ -1136,7 +1185,7 @@ button:disabled {
   content: "↳";
   position: absolute;
   top: 8px;
-  left: -22px;
+  left: -16px;
   color: var(--text-muted);
   font-size: 13px;
 }
@@ -1238,7 +1287,7 @@ button:disabled {
   align-self: start;
   width: 22px;
   height: 22px;
-  margin: 1px -2px 0 0;
+  margin: 0;
   padding: 0;
   border: 0;
   border-radius: 6px;
@@ -1257,23 +1306,31 @@ button:disabled {
 }
 
 .checklist-subtask-button {
-  align-self: start;
-  min-height: 22px;
-  margin-top: 1px;
-  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 18px;
+  padding: 0;
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 9px;
-  font-weight: 650;
-  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
 }
 
 .checklist-subtask-button:hover {
   background: var(--surface);
   color: var(--primary);
+}
+
+.checklist-item-actions {
+  display: grid;
+  justify-items: center;
+  align-self: start;
+  margin: 1px -2px 0 0;
 }
 
 .checklist-delete-button:hover {
@@ -1316,41 +1373,6 @@ button:disabled {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 7px;
   margin-top: 9px;
-}
-
-.add-subtask-form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 6px;
-  margin: 0 0 1px 25px;
-  padding: 7px;
-  border: 1px dashed var(--border-strong);
-  border-radius: 10px;
-  background: var(--surface);
-}
-
-.add-subtask-form input {
-  min-width: 0;
-  min-height: 31px;
-  padding: 0 8px;
-  font-size: 10px;
-}
-
-.subtask-cancel-button {
-  width: 28px;
-  min-height: 31px;
-  padding: 0;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 16px;
-}
-
-.subtask-cancel-button:hover {
-  background: var(--surface-hover);
-  color: var(--text);
 }
 
 .add-checklist-form input {

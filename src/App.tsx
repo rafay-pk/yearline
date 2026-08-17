@@ -1,6 +1,5 @@
 import calendarIcon from "./assets/calendar.svg";
 import {
-  Fragment,
   FormEvent,
   useEffect,
   useLayoutEffect,
@@ -30,6 +29,7 @@ import {
   deleteSpecialDate,
   initializeDatabase,
   loadSnapshot,
+  MAX_CHECKLIST_DEPTH,
   Milestone,
   parseImportPayload,
   Project,
@@ -229,6 +229,7 @@ function setDragPayload(
 
 interface ChecklistTextEditorProps {
   item: ChecklistItem;
+  autoFocus?: boolean;
   onSave: (input: {
     id: number;
     text: string;
@@ -237,6 +238,7 @@ interface ChecklistTextEditorProps {
 
 function ChecklistTextEditor({
   item,
+  autoFocus = false,
   onSave
 }: ChecklistTextEditorProps) {
   const [text, setText] = useState(item.text);
@@ -247,6 +249,15 @@ function ChecklistTextEditor({
   useEffect(() => {
     setText(item.text);
   }, [item.id, item.text]);
+
+  useEffect(() => {
+    if (!autoFocus) {
+      return;
+    }
+
+    textareaRef.current?.focus();
+    textareaRef.current?.select();
+  }, [autoFocus]);
 
   useLayoutEffect(() => {
     const textarea = textareaRef.current;
@@ -295,6 +306,12 @@ function ChecklistTextEditor({
         .join(" ")}
       rows={1}
       value={text}
+      autoFocus={autoFocus}
+      placeholder={
+        item.parentId === null
+          ? "Checklist task"
+          : "New subtask…"
+      }
       aria-label="Checklist task"
       onChange={(event) =>
         setText(event.target.value)
@@ -542,33 +559,104 @@ function orderedChecklistItems(
     first.position - second.position ||
     first.id - second.id;
 
-  const roots = items
+  const childrenByParentId = new Map<
+    number,
+    ChecklistItem[]
+  >();
+
+  for (const item of items) {
+    if (item.parentId === null) {
+      continue;
+    }
+
+    const siblings =
+      childrenByParentId.get(item.parentId) ?? [];
+
+    siblings.push(item);
+    childrenByParentId.set(
+      item.parentId,
+      siblings
+    );
+  }
+
+  for (const siblings of childrenByParentId.values()) {
+    siblings.sort(byPosition);
+  }
+
+  const ordered: ChecklistItem[] = [];
+  const visitedIds = new Set<number>();
+
+  function appendItem(item: ChecklistItem): void {
+    if (visitedIds.has(item.id)) {
+      return;
+    }
+
+    visitedIds.add(item.id);
+    ordered.push(item);
+
+    for (
+      const child of
+        childrenByParentId.get(item.id) ?? []
+    ) {
+      appendItem(child);
+    }
+  }
+
+  items
     .filter(
       (item) =>
         item.parentId === null ||
         !itemIds.has(item.parentId)
     )
-    .sort(byPosition);
+    .sort(byPosition)
+    .forEach(appendItem);
 
-  const ordered = roots.flatMap((root) => [
-    root,
-    ...items
-      .filter(
-        (item) => item.parentId === root.id
-      )
-      .sort(byPosition)
-  ]);
+  items
+    .filter((item) => !visitedIds.has(item.id))
+    .sort(byPosition)
+    .forEach(appendItem);
 
-  const orderedIds = new Set(
-    ordered.map((item) => item.id)
+  return ordered;
+}
+
+function checklistItemDepth(
+  item: ChecklistItem,
+  items: ChecklistItem[]
+): number {
+  const itemById = new Map(
+    items.map((candidate) => [
+      candidate.id,
+      candidate
+    ])
   );
 
-  return [
-    ...ordered,
-    ...items
-      .filter((item) => !orderedIds.has(item.id))
-      .sort(byPosition)
-  ];
+  const visitedIds = new Set<number>([
+    item.id
+  ]);
+
+  let depth = 0;
+  let parentId = item.parentId;
+
+  while (
+    parentId !== null &&
+    depth < MAX_CHECKLIST_DEPTH
+  ) {
+    if (visitedIds.has(parentId)) {
+      break;
+    }
+
+    const parent = itemById.get(parentId);
+
+    if (!parent) {
+      break;
+    }
+
+    visitedIds.add(parentId);
+    depth += 1;
+    parentId = parent.parentId;
+  }
+
+  return depth;
 }
 
 function isMilestoneComplete(
@@ -1979,30 +2067,6 @@ async function handleDateDrop(
         </div>
 
         <div className="toolbar-actions">
-          <select
-            className="project-filter-select"
-            value={visibleProjectId ?? ""}
-            onChange={(event) => {
-              const value = event.target.value;
-
-              setVisibleProjectId(
-                value ? Number(value) : null
-              );
-            }}
-            title="Show timelines for one project"
-            aria-label="Filter timelines by project"
-          >
-            <option value="">All projects</option>
-            {snapshot.projects.map((project) => (
-              <option
-                key={project.id}
-                value={project.id}
-              >
-                {project.emoji} {project.title}
-              </option>
-            ))}
-          </select>
-
           <button
             className="secondary-button"
             onClick={() => void handleImport()}
@@ -2063,25 +2127,89 @@ async function handleDateDrop(
             Create a project to begin planning.
           </span>
         ) : (
-          snapshot.projects.map((project) => (
-            <button
-              key={project.id}
-              data-panel-trigger="true"
-              className="legend-project"
-              onClick={() =>
-                setSelection({
-                  kind: "project",
-                  id: project.id
-                })
-              }
-            >
-              <span className="legend-emoji">
-                {project.emoji}
-              </span>
+          snapshot.projects.map((project) => {
+            const isVisibleProject =
+              visibleProjectId === project.id;
 
-              {project.title}
-            </button>
-          ))
+            const isDimmedProject =
+              visibleProjectId !== null &&
+              !isVisibleProject;
+
+            const accentColor =
+              sortedMilestones(project)[0]?.color ??
+              "var(--primary)";
+
+            return (
+              <div
+                key={project.id}
+                className={[
+                  "legend-project",
+                  isVisibleProject
+                    ? "legend-project-selected"
+                    : "",
+                  isDimmedProject
+                    ? "legend-project-dimmed"
+                    : ""
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                style={
+                  {
+                    "--project-accent": accentColor
+                  } as React.CSSProperties
+                }
+              >
+                <button
+                  type="button"
+                  data-panel-trigger="true"
+                  className="legend-project-visibility"
+                  aria-label={
+                    isVisibleProject
+                      ? `Show all project timelines`
+                      : `Only show ${project.title} timelines`
+                  }
+                  aria-pressed={isVisibleProject}
+                  title={
+                    isVisibleProject
+                      ? "Show all project timelines"
+                      : `Only show ${project.title}`
+                  }
+                  onClick={() =>
+                    setVisibleProjectId(
+                      isVisibleProject
+                        ? null
+                        : project.id
+                    )
+                  }
+                >
+                  <span className="legend-emoji">
+                    {project.emoji}
+                  </span>
+
+                  <span
+                    className="legend-project-eye"
+                    aria-hidden="true"
+                  >
+                    👁
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  data-panel-trigger="true"
+                  className="legend-project-details"
+                  onClick={() =>
+                    setSelection({
+                      kind: "project",
+                      id: project.id
+                    })
+                  }
+                >
+                  {project.title}
+                </button>
+              </div>
+            );
+          })
         )}
 
         <span className="legend-help">
@@ -2204,32 +2332,35 @@ async function handleDateDrop(
           milestone,
           text,
           parentId = null
-        ) =>
-          commitAction(
+        ) => {
+          let checklistItemId = 0;
+
+          return commitAction(
             parentId === null
               ? `Added checklist item to "${milestone.title}"`
               : `Added subtask to "${milestone.title}"`,
             async () => {
-              await addChecklistItem({
-                milestoneId: milestone.id,
-                parentId,
-                text,
-                position:
-                  milestone.checklist.filter(
-                    (item) =>
-                      item.parentId === parentId
-                  ).reduce(
-                    (maximum, item) =>
-                      Math.max(
-                        maximum,
-                        item.position + 1
-                      ),
-                    0
-                  )
-              });
+              checklistItemId =
+                await addChecklistItem({
+                  milestoneId: milestone.id,
+                  parentId,
+                  text,
+                  position:
+                    milestone.checklist.filter(
+                      (item) =>
+                        item.parentId === parentId
+                    ).reduce(
+                      (maximum, item) =>
+                        Math.max(
+                          maximum,
+                          item.position + 1
+                        ),
+                      0
+                    )
+                });
             }
-          )
-        }
+          ).then(() => checklistItemId);
+        }}
         onUpdateChecklistItem={(input) =>
           handleChecklistItemUpdate(input)
         }
@@ -3165,7 +3296,7 @@ interface SidePanelProps {
     milestone: Milestone,
     text: string,
     parentId?: number | null
-  ) => Promise<void>;
+  ) => Promise<number>;
   onUpdateChecklistItem: (input: {
     id: number;
     text?: string;
@@ -3641,7 +3772,7 @@ interface MilestoneEditorProps {
     milestone: Milestone,
     text: string,
     parentId?: number | null
-  ) => Promise<void>;
+  ) => Promise<number>;
   onUpdateChecklistItem: (input: {
     id: number;
     text?: string;
@@ -3694,11 +3825,10 @@ function MilestoneEditor({
   const [newChecklistText, setNewChecklistText] =
     useState("");
 
-  const [subtaskParentId, setSubtaskParentId] =
-    useState<number | null>(null);
-
-  const [newSubtaskText, setNewSubtaskText] =
-    useState("");
+  const [
+    editingChecklistItemId,
+    setEditingChecklistItemId
+  ] = useState<number | null>(null);
 
   const completedItems =
     milestone.checklist.filter(
@@ -3821,27 +3951,26 @@ function MilestoneEditor({
         movedItem
       );
 
-      let regrouped: ChecklistItem[];
+      const siblingPositionById = new Map(
+        reorderedSiblings.map((item, position) => [
+          item.id,
+          position
+        ])
+      );
 
-      if (draggedItem.parentId === null) {
-        regrouped = reorderedSiblings.flatMap(
-          (root) => [
-            root,
-            ...current.filter(
-              (item) =>
-                item.parentId === root.id
-            )
-          ]
-        );
-      } else {
-        let siblingIndex = 0;
+      const regrouped = orderedChecklistItems(
+        current.map((item) => {
+          const position =
+            siblingPositionById.get(item.id);
 
-        regrouped = current.map((item) =>
-          item.parentId === draggedItem.parentId
-            ? reorderedSiblings[siblingIndex++]
-            : item
-        );
-      }
+          return position === undefined
+            ? item
+            : {
+                ...item,
+                position
+              };
+        })
+      );
 
       const positionedItems = regrouped.map(
         (item, position) => ({
@@ -3911,28 +4040,6 @@ function MilestoneEditor({
       milestone,
       text,
       null
-    );
-  }
-
-  async function submitSubtask(
-    event: FormEvent,
-    parentId: number
-  ): Promise<void> {
-    event.preventDefault();
-
-    const text = newSubtaskText.trim();
-
-    if (!text) {
-      return;
-    }
-
-    setNewSubtaskText("");
-    setSubtaskParentId(null);
-
-    await onAddChecklistItem(
-      milestone,
-      text,
-      parentId
     );
   }
 
@@ -4164,13 +4271,22 @@ function MilestoneEditor({
               void saveChecklistOrder();
             }}
           >
-            {orderedChecklist.map((item) => (
-              <Fragment key={item.id}>
+            {orderedChecklist.map((item) => {
+              const depth = checklistItemDepth(
+                item,
+                orderedChecklist
+              );
+
+              const canAddSubtask =
+                depth < MAX_CHECKLIST_DEPTH;
+
+              return (
               <div
+                key={item.id}
                 draggable
                 className={[
                   "checklist-item",
-                  item.parentId !== null
+                  depth > 0
                     ? "checklist-subtask"
                     : "",
                   item.isDone
@@ -4189,6 +4305,11 @@ function MilestoneEditor({
                 ]
                   .filter(Boolean)
                   .join(" ")}
+                style={
+                  {
+                    "--checklist-depth": depth
+                  } as React.CSSProperties
+                }
                 onDragStart={(event) => {
                   const target =
                     event.target as HTMLElement;
@@ -4321,7 +4442,7 @@ function MilestoneEditor({
                 <input
                   type="checkbox"
                   checked={item.isDone}
-                  aria-label={`Mark ${item.text} as complete`}
+                  aria-label={`Mark ${item.text || "task"} as complete`}
                   onChange={(event) =>
                     void onUpdateChecklistItem({
                       id: item.id,
@@ -4333,92 +4454,57 @@ function MilestoneEditor({
 
                 <ChecklistTextEditor
                   item={item}
+                  autoFocus={
+                    editingChecklistItemId ===
+                    item.id
+                  }
                   onSave={
                     onUpdateChecklistItem
                   }
                 />
 
-                {item.parentId === null && (
+                <div className="checklist-item-actions">
                   <button
                     type="button"
-                    className="checklist-subtask-button"
-                    title="Add subtask"
-                    aria-label={`Add a subtask to ${item.text}`}
-                    onClick={() => {
-                      setNewSubtaskText("");
-                      setSubtaskParentId(item.id);
-                    }}
-                  >
-                    + subtask
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  className="checklist-delete-button"
-                  title="Delete task"
-                  aria-label={`Delete ${item.text}`}
-                  onClick={() =>
-                    void onDeleteChecklistItem(
-                      item
-                    )
-                  }
-                >
-                  ×
-                </button>
-              </div>
-
-              {subtaskParentId === item.id && (
-                <form
-                  className="add-subtask-form"
-                  onSubmit={(event) =>
-                    void submitSubtask(
-                      event,
-                      item.id
-                    )
-                  }
-                >
-                  <input
-                    autoFocus
-                    value={newSubtaskText}
-                    onChange={(event) =>
-                      setNewSubtaskText(
-                        event.target.value
+                    className="checklist-delete-button"
+                    title="Delete task"
+                    aria-label={`Delete ${item.text || "task"}`}
+                    onClick={() =>
+                      void onDeleteChecklistItem(
+                        item
                       )
                     }
-                    onKeyDown={(event) => {
-                      if (event.key === "Escape") {
-                        event.preventDefault();
-                        setNewSubtaskText("");
-                        setSubtaskParentId(null);
-                      }
-                    }}
-                    placeholder="New subtask…"
-                    aria-label={`New subtask for ${item.text}`}
-                  />
-
-                  <button
-                    className="small-button"
-                    type="submit"
-                  >
-                    Add
-                  </button>
-
-                  <button
-                    className="subtask-cancel-button"
-                    type="button"
-                    onClick={() => {
-                      setNewSubtaskText("");
-                      setSubtaskParentId(null);
-                    }}
-                    aria-label="Cancel adding subtask"
                   >
                     ×
                   </button>
-                </form>
-              )}
-              </Fragment>
-            ))}
+
+                  {canAddSubtask && (
+                    <button
+                      type="button"
+                      className="checklist-subtask-button"
+                      title={`Add subtask (level ${depth + 1} of ${MAX_CHECKLIST_DEPTH})`}
+                      aria-label={`Add a subtask to ${item.text || "task"}`}
+                      onClick={() => {
+                        void onAddChecklistItem(
+                          milestone,
+                          "",
+                          item.id
+                        ).then((createdItemId) => {
+                          if (createdItemId !== 0) {
+                            setEditingChecklistItemId(
+                              createdItemId
+                            );
+                          }
+                        });
+                      }}
+                    >
+                      +
+                    </button>
+                  )}
+                </div>
+              </div>
+              );
+            })}
           </div>
 
           <form
