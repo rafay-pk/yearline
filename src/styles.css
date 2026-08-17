@@ -53,7 +53,8 @@
     -18px 0 55px rgba(0, 0, 0, 0.45);
 }
 
-.font-select {
+.font-select,
+.project-filter-select {
   max-width: 138px;
   min-height: 36px;
   padding: 0 9px;
@@ -67,11 +68,19 @@
   font-weight: 650;
 }
 
-.font-select:hover {
+.project-filter-select {
+  width: 150px;
+  max-width: 18vw;
+  font-size: 11px;
+}
+
+.font-select:hover,
+.project-filter-select:hover {
   background: var(--surface-hover);
 }
 
-.font-select option {
+.font-select option,
+.project-filter-select option {
   background: var(--surface);
   color: var(--text);
 }
@@ -96,7 +105,8 @@ body {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
@@ -106,7 +116,8 @@ button {
 
 button:focus-visible,
 input:focus-visible,
-textarea:focus-visible {
+textarea:focus-visible,
+select:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
@@ -1089,6 +1100,7 @@ button:disabled {
   grid-template-columns:
     auto
     minmax(0, 1fr)
+    auto
     auto;
   align-items: start;
   gap: 9px;
@@ -1103,6 +1115,30 @@ button:disabled {
     transform 120ms ease,
     border-color 120ms ease,
     background 120ms ease;
+}
+
+.checklist-subtask {
+  position: relative;
+  grid-template-columns:
+    auto
+    minmax(0, 1fr)
+    auto;
+  margin-left: 25px;
+  background:
+    color-mix(
+      in srgb,
+      var(--surface-muted) 72%,
+      var(--surface)
+    );
+}
+
+.checklist-subtask::before {
+  content: "↳";
+  position: absolute;
+  top: 8px;
+  left: -22px;
+  color: var(--text-muted);
+  font-size: 13px;
 }
 
 .checklist-item:active {
@@ -1202,7 +1238,7 @@ button:disabled {
   align-self: start;
   width: 22px;
   height: 22px;
-  margin: 1px -2px 0 -10px;
+  margin: 1px -2px 0 0;
   padding: 0;
   border: 0;
   border-radius: 6px;
@@ -1218,6 +1254,26 @@ button:disabled {
     opacity 120ms ease,
     color 120ms ease,
     background 120ms ease;
+}
+
+.checklist-subtask-button {
+  align-self: start;
+  min-height: 22px;
+  margin-top: 1px;
+  padding: 0 5px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.checklist-subtask-button:hover {
+  background: var(--surface);
+  color: var(--primary);
 }
 
 .checklist-delete-button:hover {
@@ -1260,6 +1316,41 @@ button:disabled {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 7px;
   margin-top: 9px;
+}
+
+.add-subtask-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 6px;
+  margin: 0 0 1px 25px;
+  padding: 7px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.add-subtask-form input {
+  min-width: 0;
+  min-height: 31px;
+  padding: 0 8px;
+  font-size: 10px;
+}
+
+.subtask-cancel-button {
+  width: 28px;
+  min-height: 31px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.subtask-cancel-button:hover {
+  background: var(--surface-hover);
+  color: var(--text);
 }
 
 .add-checklist-form input {

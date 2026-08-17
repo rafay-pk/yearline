@@ -1,5 +1,6 @@
 import calendarIcon from "./assets/calendar.svg";
 import {
+  Fragment,
   FormEvent,
   useEffect,
   useLayoutEffect,
@@ -527,6 +528,49 @@ function sortedMilestones(
   );
 }
 
+function orderedChecklistItems(
+  items: ChecklistItem[]
+): ChecklistItem[] {
+  const itemIds = new Set(
+    items.map((item) => item.id)
+  );
+
+  const byPosition = (
+    first: ChecklistItem,
+    second: ChecklistItem
+  ) =>
+    first.position - second.position ||
+    first.id - second.id;
+
+  const roots = items
+    .filter(
+      (item) =>
+        item.parentId === null ||
+        !itemIds.has(item.parentId)
+    )
+    .sort(byPosition);
+
+  const ordered = roots.flatMap((root) => [
+    root,
+    ...items
+      .filter(
+        (item) => item.parentId === root.id
+      )
+      .sort(byPosition)
+  ]);
+
+  const orderedIds = new Set(
+    ordered.map((item) => item.id)
+  );
+
+  return [
+    ...ordered,
+    ...items
+      .filter((item) => !orderedIds.has(item.id))
+      .sort(byPosition)
+  ];
+}
+
 function isMilestoneComplete(
   milestone: Milestone
 ): boolean {
@@ -872,6 +916,9 @@ export default function App() {
     new Date().getFullYear()
   );
 
+  const [visibleProjectId, setVisibleProjectId] =
+    useState<number | null>(null);
+
   const [loading, setLoading] = useState(true);
 
   const [theme, setTheme] = useState<Theme>(() => {
@@ -1089,9 +1136,28 @@ export default function App() {
     }, 1500);
   }
 
+  const visibleProjects = useMemo(
+    () =>
+      visibleProjectId === null
+        ? snapshot.projects
+        : snapshot.projects.filter(
+            (project) =>
+              project.id === visibleProjectId
+          ),
+    [snapshot.projects, visibleProjectId]
+  );
+
+  const calendarSnapshot = useMemo(
+    () => ({
+      projects: visibleProjects,
+      specialDates: snapshot.specialDates
+    }),
+    [visibleProjects, snapshot.specialDates]
+  );
+
   const laneLayout = useMemo(
-    () => assignProjectLanes(snapshot.projects),
-    [snapshot.projects]
+    () => assignProjectLanes(visibleProjects),
+    [visibleProjects]
   );
 
   async function refresh(): Promise<AppSnapshot> {
@@ -1229,6 +1295,17 @@ export default function App() {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("yearline-theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (
+      visibleProjectId !== null &&
+      !snapshot.projects.some(
+        (project) => project.id === visibleProjectId
+      )
+    ) {
+      setVisibleProjectId(null);
+    }
+  }, [snapshot.projects, visibleProjectId]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -1902,6 +1979,30 @@ async function handleDateDrop(
         </div>
 
         <div className="toolbar-actions">
+          <select
+            className="project-filter-select"
+            value={visibleProjectId ?? ""}
+            onChange={(event) => {
+              const value = event.target.value;
+
+              setVisibleProjectId(
+                value ? Number(value) : null
+              );
+            }}
+            title="Show timelines for one project"
+            aria-label="Filter timelines by project"
+          >
+            <option value="">All projects</option>
+            {snapshot.projects.map((project) => (
+              <option
+                key={project.id}
+                value={project.id}
+              >
+                {project.emoji} {project.title}
+              </option>
+            ))}
+          </select>
+
           <button
             className="secondary-button"
             onClick={() => void handleImport()}
@@ -2000,7 +2101,7 @@ async function handleDateDrop(
                 key={`${year}-${monthIndex}`}
                 year={year}
                 monthIndex={monthIndex}
-                snapshot={snapshot}
+                snapshot={calendarSnapshot}
                 laneLayout={laneLayout}
                 selection={selection}
                 onSelect={setSelection}
@@ -2099,15 +2200,32 @@ async function handleDateDrop(
             });
           })
         }
-        onAddChecklistItem={(milestone, text) =>
+        onAddChecklistItem={(
+          milestone,
+          text,
+          parentId = null
+        ) =>
           commitAction(
-            `Added checklist item to "${milestone.title}"`,
+            parentId === null
+              ? `Added checklist item to "${milestone.title}"`
+              : `Added subtask to "${milestone.title}"`,
             async () => {
               await addChecklistItem({
                 milestoneId: milestone.id,
+                parentId,
                 text,
                 position:
-                  milestone.checklist.length
+                  milestone.checklist.filter(
+                    (item) =>
+                      item.parentId === parentId
+                  ).reduce(
+                    (maximum, item) =>
+                      Math.max(
+                        maximum,
+                        item.position + 1
+                      ),
+                    0
+                  )
               });
             }
           )
@@ -3045,7 +3163,8 @@ interface SidePanelProps {
   ) => Promise<void>;
   onAddChecklistItem: (
     milestone: Milestone,
-    text: string
+    text: string,
+    parentId?: number | null
   ) => Promise<void>;
   onUpdateChecklistItem: (input: {
     id: number;
@@ -3520,7 +3639,8 @@ interface MilestoneEditorProps {
   ) => Promise<void>;
   onAddChecklistItem: (
     milestone: Milestone,
-    text: string
+    text: string,
+    parentId?: number | null
   ) => Promise<void>;
   onUpdateChecklistItem: (input: {
     id: number;
@@ -3574,6 +3694,12 @@ function MilestoneEditor({
   const [newChecklistText, setNewChecklistText] =
     useState("");
 
+  const [subtaskParentId, setSubtaskParentId] =
+    useState<number | null>(null);
+
+  const [newSubtaskText, setNewSubtaskText] =
+    useState("");
+
   const completedItems =
     milestone.checklist.filter(
       (item) => item.isDone
@@ -3596,10 +3722,7 @@ function MilestoneEditor({
     orderedChecklist,
     setOrderedChecklist
   ] = useState<ChecklistItem[]>(() =>
-    [...milestone.checklist].sort(
-      (first, second) =>
-        first.position - second.position
-    )
+    orderedChecklistItems(milestone.checklist)
   );
 
   const [
@@ -3624,11 +3747,8 @@ function MilestoneEditor({
     useRef(false);
 
   useEffect(() => {
-    const nextChecklist = [
-      ...milestone.checklist
-    ].sort(
-      (first, second) =>
-        first.position - second.position
+    const nextChecklist = orderedChecklistItems(
+      milestone.checklist
     );
 
     setOrderedChecklist(nextChecklist);
@@ -3665,20 +3785,65 @@ function MilestoneEditor({
         return current;
       }
 
-      const next = [...current];
+      const draggedItem = current[fromIndex];
+      const targetItem = current[targetIndex];
 
-      const [movedItem] = next.splice(
-        fromIndex,
+      if (
+        draggedItem.parentId !==
+        targetItem.parentId
+      ) {
+        return current;
+      }
+
+      const siblings = current.filter(
+        (item) =>
+          item.parentId === draggedItem.parentId
+      );
+
+      const siblingFromIndex = siblings.findIndex(
+        (item) => item.id === draggedItemId
+      );
+
+      const siblingTargetIndex = siblings.findIndex(
+        (item) => item.id === targetItemId
+      );
+
+      const reorderedSiblings = [...siblings];
+
+      const [movedItem] = reorderedSiblings.splice(
+        siblingFromIndex,
         1
       );
 
-      next.splice(
-        targetIndex,
+      reorderedSiblings.splice(
+        siblingTargetIndex,
         0,
         movedItem
       );
 
-      const positionedItems = next.map(
+      let regrouped: ChecklistItem[];
+
+      if (draggedItem.parentId === null) {
+        regrouped = reorderedSiblings.flatMap(
+          (root) => [
+            root,
+            ...current.filter(
+              (item) =>
+                item.parentId === root.id
+            )
+          ]
+        );
+      } else {
+        let siblingIndex = 0;
+
+        regrouped = current.map((item) =>
+          item.parentId === draggedItem.parentId
+            ? reorderedSiblings[siblingIndex++]
+            : item
+        );
+      }
+
+      const positionedItems = regrouped.map(
         (item, position) => ({
           ...item,
           position
@@ -3744,7 +3909,30 @@ function MilestoneEditor({
     setNewChecklistText("");
     await onAddChecklistItem(
       milestone,
-      text
+      text,
+      null
+    );
+  }
+
+  async function submitSubtask(
+    event: FormEvent,
+    parentId: number
+  ): Promise<void> {
+    event.preventDefault();
+
+    const text = newSubtaskText.trim();
+
+    if (!text) {
+      return;
+    }
+
+    setNewSubtaskText("");
+    setSubtaskParentId(null);
+
+    await onAddChecklistItem(
+      milestone,
+      text,
+      parentId
     );
   }
 
@@ -3977,11 +4165,14 @@ function MilestoneEditor({
             }}
           >
             {orderedChecklist.map((item) => (
+              <Fragment key={item.id}>
               <div
-                key={item.id}
                 draggable
                 className={[
                   "checklist-item",
+                  item.parentId !== null
+                    ? "checklist-subtask"
+                    : "",
                   item.isDone
                     ? "checklist-item-complete"
                     : "",
@@ -4039,6 +4230,21 @@ function MilestoneEditor({
                       null ||
                     draggedChecklistItemId ===
                       item.id
+                  ) {
+                    return;
+                  }
+
+                  const draggedItem =
+                    orderedChecklistRef.current.find(
+                      (candidate) =>
+                        candidate.id ===
+                        draggedChecklistItemId
+                    );
+
+                  if (
+                    !draggedItem ||
+                    draggedItem.parentId !==
+                      item.parentId
                   ) {
                     return;
                   }
@@ -4132,6 +4338,21 @@ function MilestoneEditor({
                   }
                 />
 
+                {item.parentId === null && (
+                  <button
+                    type="button"
+                    className="checklist-subtask-button"
+                    title="Add subtask"
+                    aria-label={`Add a subtask to ${item.text}`}
+                    onClick={() => {
+                      setNewSubtaskText("");
+                      setSubtaskParentId(item.id);
+                    }}
+                  >
+                    + subtask
+                  </button>
+                )}
+
                 <button
                   type="button"
                   className="checklist-delete-button"
@@ -4146,6 +4367,57 @@ function MilestoneEditor({
                   ×
                 </button>
               </div>
+
+              {subtaskParentId === item.id && (
+                <form
+                  className="add-subtask-form"
+                  onSubmit={(event) =>
+                    void submitSubtask(
+                      event,
+                      item.id
+                    )
+                  }
+                >
+                  <input
+                    autoFocus
+                    value={newSubtaskText}
+                    onChange={(event) =>
+                      setNewSubtaskText(
+                        event.target.value
+                      )
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") {
+                        event.preventDefault();
+                        setNewSubtaskText("");
+                        setSubtaskParentId(null);
+                      }
+                    }}
+                    placeholder="New subtask…"
+                    aria-label={`New subtask for ${item.text}`}
+                  />
+
+                  <button
+                    className="small-button"
+                    type="submit"
+                  >
+                    Add
+                  </button>
+
+                  <button
+                    className="subtask-cancel-button"
+                    type="button"
+                    onClick={() => {
+                      setNewSubtaskText("");
+                      setSubtaskParentId(null);
+                    }}
+                    aria-label="Cancel adding subtask"
+                  >
+                    ×
+                  </button>
+                </form>
+              )}
+              </Fragment>
             ))}
           </div>
 
