@@ -82,7 +82,7 @@ Yearline is built with:
 
 ### Requirements
 
-- Windows 10 or Windows 11
+- Tested only on: Windows 10, Windows 11, Fedora 44
 - Node.js
 - Rust with the MSVC toolchain
 - Microsoft C++ Build Tools
@@ -91,7 +91,7 @@ Yearline is built with:
 ### Clone and install
 
 ```
-git clone <your-repository-url>
+git clone https://github.com/rafay-pk/yearline.git
 cd yearline
 npm install
 ```
@@ -102,7 +102,7 @@ npm install
 npm run tauri dev
 ```
 
-### Create a Produciton Build
+### Create a Production Build
 
 ```
 npm run tauri build
@@ -110,7 +110,7 @@ npm run tauri build
 The Windows installer will be generated under `src-tauri/target/release/bundle/`
 
 # Data and privacy
-Yearline does not require an account and does not send calendar information to an external server. Project data is stored locally on the user's computer. 
+Yearline does not require an account and does not send calendar information to an external server. Project data is stored locally on the user's computer.
 > Users are responsible for creating JSON backups when moving between computers or reinstalling the application.
 
 # Import and export
