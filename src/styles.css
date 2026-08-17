@@ -1154,7 +1154,7 @@ button:disabled {
     auto
     minmax(0, 1fr)
     auto;
-  align-items: start;
+  align-items: center;
   gap: 9px;
   min-width: 0;
   padding: 9px 10px;
@@ -1167,6 +1167,14 @@ button:disabled {
     transform 120ms ease,
     border-color 120ms ease,
     background 120ms ease;
+}
+
+.checklist-item-with-subtasks {
+  grid-template-columns:
+    auto
+    auto
+    minmax(0, 1fr)
+    auto;
 }
 
 .checklist-subtask {
@@ -1215,8 +1223,43 @@ button:disabled {
 }
 
 .checklist-item > input[type="checkbox"] {
-  margin-top: 5px;
+  margin-top: 0;
   cursor: pointer;
+}
+
+.checklist-expand-button {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin: 0 -4px 0 -3px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.checklist-expand-button:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.checklist-expand-button svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transform: rotate(90deg);
+  transition: transform 120ms ease;
+}
+
+.checklist-expand-button-collapsed svg {
+  transform: rotate(0deg);
 }
 
 .checklist-drag-grip {
@@ -1237,6 +1280,7 @@ button:disabled {
 
 .checklist-textarea {
   display: block;
+  align-self: center;
   width: 100%;
   min-width: 0;
   min-height: 24px;
@@ -1329,7 +1373,7 @@ button:disabled {
 .checklist-item-actions {
   display: grid;
   justify-items: center;
-  align-self: start;
+  align-self: center;
   margin: 1px -2px 0 0;
 }
 

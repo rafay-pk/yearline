@@ -234,17 +234,21 @@ interface ChecklistTextEditorProps {
     id: number;
     text: string;
   }) => void | Promise<void>;
+  onCreateNext?: () => void | Promise<void>;
 }
 
 function ChecklistTextEditor({
   item,
   autoFocus = false,
-  onSave
+  onSave,
+  onCreateNext
 }: ChecklistTextEditorProps) {
   const [text, setText] = useState(item.text);
 
   const textareaRef =
     useRef<HTMLTextAreaElement | null>(null);
+
+  const skipNextBlurSaveRef = useRef(false);
 
   useEffect(() => {
     setText(item.text);
@@ -316,18 +320,39 @@ function ChecklistTextEditor({
       onChange={(event) =>
         setText(event.target.value)
       }
-      onBlur={saveText}
+      onBlur={() => {
+        if (skipNextBlurSaveRef.current) {
+          skipNextBlurSaveRef.current = false;
+          return;
+        }
+
+        saveText();
+      }}
       onKeyDown={(event) => {
-        /*
-          Enter remains available for intentional
-          line breaks. Ctrl+Enter saves the task.
-        */
         if (
           event.key === "Enter" &&
-          (event.ctrlKey || event.metaKey)
+          !event.shiftKey &&
+          !event.nativeEvent.isComposing
         ) {
           event.preventDefault();
-          event.currentTarget.blur();
+
+          const nextText = text.trim();
+
+          if (!nextText) {
+            return;
+          }
+
+          setText(nextText);
+          skipNextBlurSaveRef.current = true;
+
+          void Promise.resolve(
+            nextText === item.text
+              ? undefined
+              : onSave({
+                  id: item.id,
+                  text: nextText
+                })
+          ).then(() => onCreateNext?.());
         }
 
         if (event.key === "Escape") {
@@ -657,6 +682,45 @@ function checklistItemDepth(
   }
 
   return depth;
+}
+
+function isChecklistItemVisible(
+  item: ChecklistItem,
+  items: ChecklistItem[],
+  collapsedItemIds: Set<number>
+): boolean {
+  const itemById = new Map(
+    items.map((candidate) => [
+      candidate.id,
+      candidate
+    ])
+  );
+
+  const visitedIds = new Set<number>([
+    item.id
+  ]);
+
+  let parentId = item.parentId;
+
+  while (parentId !== null) {
+    if (
+      visitedIds.has(parentId) ||
+      collapsedItemIds.has(parentId)
+    ) {
+      return false;
+    }
+
+    const parent = itemById.get(parentId);
+
+    if (!parent) {
+      return true;
+    }
+
+    visitedIds.add(parentId);
+    parentId = parent.parentId;
+  }
+
+  return true;
 }
 
 function isMilestoneComplete(
@@ -3830,6 +3894,13 @@ function MilestoneEditor({
     setEditingChecklistItemId
   ] = useState<number | null>(null);
 
+  const [
+    collapsedChecklistItemIds,
+    setCollapsedChecklistItemIds
+  ] = useState<Set<number>>(
+    () => new Set()
+  );
+
   const completedItems =
     milestone.checklist.filter(
       (item) => item.isDone
@@ -3875,6 +3946,21 @@ function MilestoneEditor({
 
   const checklistDropCompletedRef =
     useRef(false);
+
+  const visibleChecklist = useMemo(
+    () =>
+      orderedChecklist.filter((item) =>
+        isChecklistItemVisible(
+          item,
+          orderedChecklist,
+          collapsedChecklistItemIds
+        )
+      ),
+    [
+      orderedChecklist,
+      collapsedChecklistItemIds
+    ]
+  );
 
   useEffect(() => {
     const nextChecklist = orderedChecklistItems(
@@ -4041,6 +4127,33 @@ function MilestoneEditor({
       text,
       null
     );
+  }
+
+  async function createEmptyChecklistItem(
+    parentId: number | null
+  ): Promise<void> {
+    if (parentId !== null) {
+      setCollapsedChecklistItemIds((current) => {
+        if (!current.has(parentId)) {
+          return current;
+        }
+
+        const next = new Set(current);
+        next.delete(parentId);
+        return next;
+      });
+    }
+
+    const createdItemId =
+      await onAddChecklistItem(
+        milestone,
+        "",
+        parentId
+      );
+
+    if (createdItemId !== 0) {
+      setEditingChecklistItemId(createdItemId);
+    }
   }
 
   return (
@@ -4271,11 +4384,22 @@ function MilestoneEditor({
               void saveChecklistOrder();
             }}
           >
-            {orderedChecklist.map((item) => {
+            {visibleChecklist.map((item) => {
               const depth = checklistItemDepth(
                 item,
                 orderedChecklist
               );
+
+              const hasSubtasks =
+                orderedChecklist.some(
+                  (candidate) =>
+                    candidate.parentId === item.id
+                );
+
+              const isCollapsed =
+                collapsedChecklistItemIds.has(
+                  item.id
+                );
 
               const canAddSubtask =
                 depth < MAX_CHECKLIST_DEPTH;
@@ -4286,6 +4410,9 @@ function MilestoneEditor({
                 draggable
                 className={[
                   "checklist-item",
+                  hasSubtasks
+                    ? "checklist-item-with-subtasks"
+                    : "",
                   depth > 0
                     ? "checklist-subtask"
                     : "",
@@ -4439,6 +4566,50 @@ function MilestoneEditor({
                     false;
                 }}
               >
+                {hasSubtasks && (
+                  <button
+                    type="button"
+                    className={[
+                      "checklist-expand-button",
+                      isCollapsed
+                        ? "checklist-expand-button-collapsed"
+                        : ""
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    aria-expanded={!isCollapsed}
+                    aria-label={
+                      isCollapsed
+                        ? `Expand subtasks for ${item.text || "task"}`
+                        : `Collapse subtasks for ${item.text || "task"}`
+                    }
+                    onClick={() =>
+                      setCollapsedChecklistItemIds(
+                        (current) => {
+                          const next = new Set(
+                            current
+                          );
+
+                          if (next.has(item.id)) {
+                            next.delete(item.id);
+                          } else {
+                            next.add(item.id);
+                          }
+
+                          return next;
+                        }
+                      )
+                    }
+                  >
+                    <svg
+                      viewBox="0 0 16 16"
+                      aria-hidden="true"
+                    >
+                      <path d="M5.5 3.5 10 8l-4.5 4.5" />
+                    </svg>
+                  </button>
+                )}
+
                 <input
                   type="checkbox"
                   checked={item.isDone}
@@ -4460,6 +4631,11 @@ function MilestoneEditor({
                   }
                   onSave={
                     onUpdateChecklistItem
+                  }
+                  onCreateNext={() =>
+                    createEmptyChecklistItem(
+                      item.parentId
+                    )
                   }
                 />
 
@@ -4485,17 +4661,9 @@ function MilestoneEditor({
                       title={`Add subtask (level ${depth + 1} of ${MAX_CHECKLIST_DEPTH})`}
                       aria-label={`Add a subtask to ${item.text || "task"}`}
                       onClick={() => {
-                        void onAddChecklistItem(
-                          milestone,
-                          "",
+                        void createEmptyChecklistItem(
                           item.id
-                        ).then((createdItemId) => {
-                          if (createdItemId !== 0) {
-                            setEditingChecklistItemId(
-                              createdItemId
-                            );
-                          }
-                        });
+                        );
                       }}
                     >
                       +
