@@ -1169,14 +1169,6 @@ button:disabled {
     background 120ms ease;
 }
 
-.checklist-item-with-subtasks {
-  grid-template-columns:
-    auto
-    auto
-    minmax(0, 1fr)
-    auto;
-}
-
 .checklist-subtask {
   position: relative;
   margin-left:
@@ -1222,8 +1214,17 @@ button:disabled {
     );
 }
 
-.checklist-item > input[type="checkbox"] {
-  margin-top: 0;
+.checklist-item-leading {
+  display: grid;
+  place-items: center;
+  align-self: center;
+  width: 22px;
+  min-width: 22px;
+  gap: 1px;
+}
+
+.checklist-item-leading > input[type="checkbox"] {
+  margin: 0;
   cursor: pointer;
 }
 
@@ -1231,8 +1232,8 @@ button:disabled {
   display: grid;
   place-items: center;
   width: 22px;
-  height: 22px;
-  margin: 0 -4px 0 -3px;
+  height: 18px;
+  margin: 0;
   padding: 0;
   border: 0;
   border-radius: 6px;

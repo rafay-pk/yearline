@@ -4410,9 +4410,6 @@ function MilestoneEditor({
                 draggable
                 className={[
                   "checklist-item",
-                  hasSubtasks
-                    ? "checklist-item-with-subtasks"
-                    : "",
                   depth > 0
                     ? "checklist-subtask"
                     : "",
@@ -4566,62 +4563,64 @@ function MilestoneEditor({
                     false;
                 }}
               >
-                {hasSubtasks && (
-                  <button
-                    type="button"
-                    className={[
-                      "checklist-expand-button",
-                      isCollapsed
-                        ? "checklist-expand-button-collapsed"
-                        : ""
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    aria-expanded={!isCollapsed}
-                    aria-label={
-                      isCollapsed
-                        ? `Expand subtasks for ${item.text || "task"}`
-                        : `Collapse subtasks for ${item.text || "task"}`
+                <div className="checklist-item-leading">
+                  <input
+                    type="checkbox"
+                    checked={item.isDone}
+                    aria-label={`Mark ${item.text || "task"} as complete`}
+                    onChange={(event) =>
+                      void onUpdateChecklistItem({
+                        id: item.id,
+                        isDone:
+                          event.target.checked
+                      })
                     }
-                    onClick={() =>
-                      setCollapsedChecklistItemIds(
-                        (current) => {
-                          const next = new Set(
-                            current
-                          );
+                  />
 
-                          if (next.has(item.id)) {
-                            next.delete(item.id);
-                          } else {
-                            next.add(item.id);
+                  {hasSubtasks && (
+                    <button
+                      type="button"
+                      className={[
+                        "checklist-expand-button",
+                        isCollapsed
+                          ? "checklist-expand-button-collapsed"
+                          : ""
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      aria-expanded={!isCollapsed}
+                      aria-label={
+                        isCollapsed
+                          ? `Expand subtasks for ${item.text || "task"}`
+                          : `Collapse subtasks for ${item.text || "task"}`
+                      }
+                      onClick={() =>
+                        setCollapsedChecklistItemIds(
+                          (current) => {
+                            const next = new Set(
+                              current
+                            );
+
+                            if (next.has(item.id)) {
+                              next.delete(item.id);
+                            } else {
+                              next.add(item.id);
+                            }
+
+                            return next;
                           }
-
-                          return next;
-                        }
-                      )
-                    }
-                  >
-                    <svg
-                      viewBox="0 0 16 16"
-                      aria-hidden="true"
+                        )
+                      }
                     >
-                      <path d="M5.5 3.5 10 8l-4.5 4.5" />
-                    </svg>
-                  </button>
-                )}
-
-                <input
-                  type="checkbox"
-                  checked={item.isDone}
-                  aria-label={`Mark ${item.text || "task"} as complete`}
-                  onChange={(event) =>
-                    void onUpdateChecklistItem({
-                      id: item.id,
-                      isDone:
-                        event.target.checked
-                    })
-                  }
-                />
+                      <svg
+                        viewBox="0 0 16 16"
+                        aria-hidden="true"
+                      >
+                        <path d="M5.5 3.5 10 8l-4.5 4.5" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
 
                 <ChecklistTextEditor
                   item={item}
