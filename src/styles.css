@@ -1216,11 +1216,18 @@ button:disabled {
 
 .checklist-item-leading {
   display: grid;
+  grid-template-rows: 40px 0;
   place-items: center;
   align-self: center;
   width: 22px;
   min-width: 22px;
-  gap: 1px;
+  height: 40px;
+  margin: 1px 0 0;
+  transition: grid-template-rows 140ms ease;
+}
+
+.checklist-item-leading-with-subtasks {
+  grid-template-rows: 22px 18px;
 }
 
 .checklist-item-leading > input[type="checkbox"] {
@@ -1240,11 +1247,33 @@ button:disabled {
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  visibility: visible;
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease,
+    visibility 0s linear;
 }
 
-.checklist-expand-button:hover {
+.checklist-expand-button:not(
+  .checklist-expand-button-hidden
+):hover {
   background: var(--surface);
   color: var(--text);
+}
+
+.checklist-expand-button-hidden,
+.checklist-expand-button-hidden:disabled {
+  cursor: default;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px) scale(0.8);
+  visibility: hidden;
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease,
+    visibility 0s linear 140ms;
 }
 
 .checklist-expand-button svg {

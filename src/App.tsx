@@ -4563,7 +4563,16 @@ function MilestoneEditor({
                     false;
                 }}
               >
-                <div className="checklist-item-leading">
+                <div
+                  className={[
+                    "checklist-item-leading",
+                    hasSubtasks
+                      ? "checklist-item-leading-with-subtasks"
+                      : ""
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
                   <input
                     type="checkbox"
                     checked={item.isDone}
@@ -4577,49 +4586,57 @@ function MilestoneEditor({
                     }
                   />
 
-                  {hasSubtasks && (
-                    <button
-                      type="button"
-                      className={[
-                        "checklist-expand-button",
-                        isCollapsed
-                          ? "checklist-expand-button-collapsed"
-                          : ""
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      aria-expanded={!isCollapsed}
-                      aria-label={
-                        isCollapsed
-                          ? `Expand subtasks for ${item.text || "task"}`
-                          : `Collapse subtasks for ${item.text || "task"}`
-                      }
-                      onClick={() =>
-                        setCollapsedChecklistItemIds(
-                          (current) => {
-                            const next = new Set(
-                              current
-                            );
+                  <button
+                    type="button"
+                    className={[
+                      "checklist-expand-button",
+                      isCollapsed
+                        ? "checklist-expand-button-collapsed"
+                        : "",
+                      !hasSubtasks
+                        ? "checklist-expand-button-hidden"
+                        : ""
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    aria-expanded={
+                      hasSubtasks
+                        ? !isCollapsed
+                        : undefined
+                    }
+                    aria-hidden={!hasSubtasks}
+                    aria-label={
+                      isCollapsed
+                        ? `Expand subtasks for ${item.text || "task"}`
+                        : `Collapse subtasks for ${item.text || "task"}`
+                    }
+                    disabled={!hasSubtasks}
+                    tabIndex={hasSubtasks ? 0 : -1}
+                    onClick={() =>
+                      setCollapsedChecklistItemIds(
+                        (current) => {
+                          const next = new Set(
+                            current
+                          );
 
-                            if (next.has(item.id)) {
-                              next.delete(item.id);
-                            } else {
-                              next.add(item.id);
-                            }
-
-                            return next;
+                          if (next.has(item.id)) {
+                            next.delete(item.id);
+                          } else {
+                            next.add(item.id);
                           }
-                        )
-                      }
+
+                          return next;
+                        }
+                      )
+                    }
+                  >
+                    <svg
+                      viewBox="0 0 16 16"
+                      aria-hidden="true"
                     >
-                      <svg
-                        viewBox="0 0 16 16"
-                        aria-hidden="true"
-                      >
-                        <path d="M5.5 3.5 10 8l-4.5 4.5" />
-                      </svg>
-                    </button>
-                  )}
+                      <path d="M5.5 3.5 10 8l-4.5 4.5" />
+                    </svg>
+                  </button>
                 </div>
 
                 <ChecklistTextEditor
