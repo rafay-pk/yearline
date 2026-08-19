@@ -29,6 +29,7 @@ import {
   deleteSpecialDate,
   initializeDatabase,
   loadSnapshot,
+  MAX_CHECKLIST_DEPTH,
   Milestone,
   parseImportPayload,
   Project,
@@ -228,24 +229,39 @@ function setDragPayload(
 
 interface ChecklistTextEditorProps {
   item: ChecklistItem;
+  autoFocus?: boolean;
   onSave: (input: {
     id: number;
     text: string;
   }) => void | Promise<void>;
+  onCreateNext?: () => void | Promise<void>;
 }
 
 function ChecklistTextEditor({
   item,
-  onSave
+  autoFocus = false,
+  onSave,
+  onCreateNext
 }: ChecklistTextEditorProps) {
   const [text, setText] = useState(item.text);
 
   const textareaRef =
     useRef<HTMLTextAreaElement | null>(null);
 
+  const skipNextBlurSaveRef = useRef(false);
+
   useEffect(() => {
     setText(item.text);
   }, [item.id, item.text]);
+
+  useEffect(() => {
+    if (!autoFocus) {
+      return;
+    }
+
+    textareaRef.current?.focus();
+    textareaRef.current?.select();
+  }, [autoFocus]);
 
   useLayoutEffect(() => {
     const textarea = textareaRef.current;
@@ -294,22 +310,49 @@ function ChecklistTextEditor({
         .join(" ")}
       rows={1}
       value={text}
+      autoFocus={autoFocus}
+      placeholder={
+        item.parentId === null
+          ? "Checklist task"
+          : "New subtask…"
+      }
       aria-label="Checklist task"
       onChange={(event) =>
         setText(event.target.value)
       }
-      onBlur={saveText}
+      onBlur={() => {
+        if (skipNextBlurSaveRef.current) {
+          skipNextBlurSaveRef.current = false;
+          return;
+        }
+
+        saveText();
+      }}
       onKeyDown={(event) => {
-        /*
-          Enter remains available for intentional
-          line breaks. Ctrl+Enter saves the task.
-        */
         if (
           event.key === "Enter" &&
-          (event.ctrlKey || event.metaKey)
+          !event.shiftKey &&
+          !event.nativeEvent.isComposing
         ) {
           event.preventDefault();
-          event.currentTarget.blur();
+
+          const nextText = text.trim();
+
+          if (!nextText) {
+            return;
+          }
+
+          setText(nextText);
+          skipNextBlurSaveRef.current = true;
+
+          void Promise.resolve(
+            nextText === item.text
+              ? undefined
+              : onSave({
+                  id: item.id,
+                  text: nextText
+                })
+          ).then(() => onCreateNext?.());
         }
 
         if (event.key === "Escape") {
@@ -525,6 +568,159 @@ function sortedMilestones(
     (first, second) =>
       first.position - second.position
   );
+}
+
+function orderedChecklistItems(
+  items: ChecklistItem[]
+): ChecklistItem[] {
+  const itemIds = new Set(
+    items.map((item) => item.id)
+  );
+
+  const byPosition = (
+    first: ChecklistItem,
+    second: ChecklistItem
+  ) =>
+    first.position - second.position ||
+    first.id - second.id;
+
+  const childrenByParentId = new Map<
+    number,
+    ChecklistItem[]
+  >();
+
+  for (const item of items) {
+    if (item.parentId === null) {
+      continue;
+    }
+
+    const siblings =
+      childrenByParentId.get(item.parentId) ?? [];
+
+    siblings.push(item);
+    childrenByParentId.set(
+      item.parentId,
+      siblings
+    );
+  }
+
+  for (const siblings of childrenByParentId.values()) {
+    siblings.sort(byPosition);
+  }
+
+  const ordered: ChecklistItem[] = [];
+  const visitedIds = new Set<number>();
+
+  function appendItem(item: ChecklistItem): void {
+    if (visitedIds.has(item.id)) {
+      return;
+    }
+
+    visitedIds.add(item.id);
+    ordered.push(item);
+
+    for (
+      const child of
+        childrenByParentId.get(item.id) ?? []
+    ) {
+      appendItem(child);
+    }
+  }
+
+  items
+    .filter(
+      (item) =>
+        item.parentId === null ||
+        !itemIds.has(item.parentId)
+    )
+    .sort(byPosition)
+    .forEach(appendItem);
+
+  items
+    .filter((item) => !visitedIds.has(item.id))
+    .sort(byPosition)
+    .forEach(appendItem);
+
+  return ordered;
+}
+
+function checklistItemDepth(
+  item: ChecklistItem,
+  items: ChecklistItem[]
+): number {
+  const itemById = new Map(
+    items.map((candidate) => [
+      candidate.id,
+      candidate
+    ])
+  );
+
+  const visitedIds = new Set<number>([
+    item.id
+  ]);
+
+  let depth = 0;
+  let parentId = item.parentId;
+
+  while (
+    parentId !== null &&
+    depth < MAX_CHECKLIST_DEPTH
+  ) {
+    if (visitedIds.has(parentId)) {
+      break;
+    }
+
+    const parent = itemById.get(parentId);
+
+    if (!parent) {
+      break;
+    }
+
+    visitedIds.add(parentId);
+    depth += 1;
+    parentId = parent.parentId;
+  }
+
+  return depth;
+}
+
+function isChecklistItemVisible(
+  item: ChecklistItem,
+  items: ChecklistItem[],
+  collapsedItemIds: Set<number>
+): boolean {
+  const itemById = new Map(
+    items.map((candidate) => [
+      candidate.id,
+      candidate
+    ])
+  );
+
+  const visitedIds = new Set<number>([
+    item.id
+  ]);
+
+  let parentId = item.parentId;
+
+  while (parentId !== null) {
+    if (
+      visitedIds.has(parentId) ||
+      collapsedItemIds.has(parentId)
+    ) {
+      return false;
+    }
+
+    const parent = itemById.get(parentId);
+
+    if (!parent) {
+      return true;
+    }
+
+    visitedIds.add(parentId);
+    parentId = parent.parentId;
+  }
+
+  return true;
 }
 
 function isMilestoneComplete(
@@ -872,6 +1068,9 @@ export default function App() {
     new Date().getFullYear()
   );
 
+  const [visibleProjectId, setVisibleProjectId] =
+    useState<number | null>(null);
+
   const [loading, setLoading] = useState(true);
 
   const [theme, setTheme] = useState<Theme>(() => {
@@ -1089,9 +1288,28 @@ export default function App() {
     }, 1500);
   }
 
+  const visibleProjects = useMemo(
+    () =>
+      visibleProjectId === null
+        ? snapshot.projects
+        : snapshot.projects.filter(
+            (project) =>
+              project.id === visibleProjectId
+          ),
+    [snapshot.projects, visibleProjectId]
+  );
+
+  const calendarSnapshot = useMemo(
+    () => ({
+      projects: visibleProjects,
+      specialDates: snapshot.specialDates
+    }),
+    [visibleProjects, snapshot.specialDates]
+  );
+
   const laneLayout = useMemo(
-    () => assignProjectLanes(snapshot.projects),
-    [snapshot.projects]
+    () => assignProjectLanes(visibleProjects),
+    [visibleProjects]
   );
 
   async function refresh(): Promise<AppSnapshot> {
@@ -1229,6 +1447,17 @@ export default function App() {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("yearline-theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (
+      visibleProjectId !== null &&
+      !snapshot.projects.some(
+        (project) => project.id === visibleProjectId
+      )
+    ) {
+      setVisibleProjectId(null);
+    }
+  }, [snapshot.projects, visibleProjectId]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -1962,25 +2191,89 @@ async function handleDateDrop(
             Create a project to begin planning.
           </span>
         ) : (
-          snapshot.projects.map((project) => (
-            <button
-              key={project.id}
-              data-panel-trigger="true"
-              className="legend-project"
-              onClick={() =>
-                setSelection({
-                  kind: "project",
-                  id: project.id
-                })
-              }
-            >
-              <span className="legend-emoji">
-                {project.emoji}
-              </span>
+          snapshot.projects.map((project) => {
+            const isVisibleProject =
+              visibleProjectId === project.id;
 
-              {project.title}
-            </button>
-          ))
+            const isDimmedProject =
+              visibleProjectId !== null &&
+              !isVisibleProject;
+
+            const accentColor =
+              sortedMilestones(project)[0]?.color ??
+              "var(--primary)";
+
+            return (
+              <div
+                key={project.id}
+                className={[
+                  "legend-project",
+                  isVisibleProject
+                    ? "legend-project-selected"
+                    : "",
+                  isDimmedProject
+                    ? "legend-project-dimmed"
+                    : ""
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                style={
+                  {
+                    "--project-accent": accentColor
+                  } as React.CSSProperties
+                }
+              >
+                <button
+                  type="button"
+                  data-panel-trigger="true"
+                  className="legend-project-visibility"
+                  aria-label={
+                    isVisibleProject
+                      ? `Show all project timelines`
+                      : `Only show ${project.title} timelines`
+                  }
+                  aria-pressed={isVisibleProject}
+                  title={
+                    isVisibleProject
+                      ? "Show all project timelines"
+                      : `Only show ${project.title}`
+                  }
+                  onClick={() =>
+                    setVisibleProjectId(
+                      isVisibleProject
+                        ? null
+                        : project.id
+                    )
+                  }
+                >
+                  <span className="legend-emoji">
+                    {project.emoji}
+                  </span>
+
+                  <span
+                    className="legend-project-eye"
+                    aria-hidden="true"
+                  >
+                    👁
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  data-panel-trigger="true"
+                  className="legend-project-details"
+                  onClick={() =>
+                    setSelection({
+                      kind: "project",
+                      id: project.id
+                    })
+                  }
+                >
+                  {project.title}
+                </button>
+              </div>
+            );
+          })
         )}
 
         <span className="legend-help">
@@ -2000,7 +2293,7 @@ async function handleDateDrop(
                 key={`${year}-${monthIndex}`}
                 year={year}
                 monthIndex={monthIndex}
-                snapshot={snapshot}
+                snapshot={calendarSnapshot}
                 laneLayout={laneLayout}
                 selection={selection}
                 onSelect={setSelection}
@@ -2099,19 +2392,39 @@ async function handleDateDrop(
             });
           })
         }
-        onAddChecklistItem={(milestone, text) =>
-          commitAction(
-            `Added checklist item to "${milestone.title}"`,
+        onAddChecklistItem={(
+          milestone,
+          text,
+          parentId = null
+        ) => {
+          let checklistItemId = 0;
+
+          return commitAction(
+            parentId === null
+              ? `Added checklist item to "${milestone.title}"`
+              : `Added subtask to "${milestone.title}"`,
             async () => {
-              await addChecklistItem({
-                milestoneId: milestone.id,
-                text,
-                position:
-                  milestone.checklist.length
-              });
+              checklistItemId =
+                await addChecklistItem({
+                  milestoneId: milestone.id,
+                  parentId,
+                  text,
+                  position:
+                    milestone.checklist.filter(
+                      (item) =>
+                        item.parentId === parentId
+                    ).reduce(
+                      (maximum, item) =>
+                        Math.max(
+                          maximum,
+                          item.position + 1
+                        ),
+                      0
+                    )
+                });
             }
-          )
-        }
+          ).then(() => checklistItemId);
+        }}
         onUpdateChecklistItem={(input) =>
           handleChecklistItemUpdate(input)
         }
@@ -3045,8 +3358,9 @@ interface SidePanelProps {
   ) => Promise<void>;
   onAddChecklistItem: (
     milestone: Milestone,
-    text: string
-  ) => Promise<void>;
+    text: string,
+    parentId?: number | null
+  ) => Promise<number>;
   onUpdateChecklistItem: (input: {
     id: number;
     text?: string;
@@ -3520,8 +3834,9 @@ interface MilestoneEditorProps {
   ) => Promise<void>;
   onAddChecklistItem: (
     milestone: Milestone,
-    text: string
-  ) => Promise<void>;
+    text: string,
+    parentId?: number | null
+  ) => Promise<number>;
   onUpdateChecklistItem: (input: {
     id: number;
     text?: string;
@@ -3574,6 +3889,18 @@ function MilestoneEditor({
   const [newChecklistText, setNewChecklistText] =
     useState("");
 
+  const [
+    editingChecklistItemId,
+    setEditingChecklistItemId
+  ] = useState<number | null>(null);
+
+  const [
+    collapsedChecklistItemIds,
+    setCollapsedChecklistItemIds
+  ] = useState<Set<number>>(
+    () => new Set()
+  );
+
   const completedItems =
     milestone.checklist.filter(
       (item) => item.isDone
@@ -3596,10 +3923,7 @@ function MilestoneEditor({
     orderedChecklist,
     setOrderedChecklist
   ] = useState<ChecklistItem[]>(() =>
-    [...milestone.checklist].sort(
-      (first, second) =>
-        first.position - second.position
-    )
+    orderedChecklistItems(milestone.checklist)
   );
 
   const [
@@ -3623,12 +3947,24 @@ function MilestoneEditor({
   const checklistDropCompletedRef =
     useRef(false);
 
+  const visibleChecklist = useMemo(
+    () =>
+      orderedChecklist.filter((item) =>
+        isChecklistItemVisible(
+          item,
+          orderedChecklist,
+          collapsedChecklistItemIds
+        )
+      ),
+    [
+      orderedChecklist,
+      collapsedChecklistItemIds
+    ]
+  );
+
   useEffect(() => {
-    const nextChecklist = [
-      ...milestone.checklist
-    ].sort(
-      (first, second) =>
-        first.position - second.position
+    const nextChecklist = orderedChecklistItems(
+      milestone.checklist
     );
 
     setOrderedChecklist(nextChecklist);
@@ -3665,20 +4001,64 @@ function MilestoneEditor({
         return current;
       }
 
-      const next = [...current];
+      const draggedItem = current[fromIndex];
+      const targetItem = current[targetIndex];
 
-      const [movedItem] = next.splice(
-        fromIndex,
+      if (
+        draggedItem.parentId !==
+        targetItem.parentId
+      ) {
+        return current;
+      }
+
+      const siblings = current.filter(
+        (item) =>
+          item.parentId === draggedItem.parentId
+      );
+
+      const siblingFromIndex = siblings.findIndex(
+        (item) => item.id === draggedItemId
+      );
+
+      const siblingTargetIndex = siblings.findIndex(
+        (item) => item.id === targetItemId
+      );
+
+      const reorderedSiblings = [...siblings];
+
+      const [movedItem] = reorderedSiblings.splice(
+        siblingFromIndex,
         1
       );
 
-      next.splice(
-        targetIndex,
+      reorderedSiblings.splice(
+        siblingTargetIndex,
         0,
         movedItem
       );
 
-      const positionedItems = next.map(
+      const siblingPositionById = new Map(
+        reorderedSiblings.map((item, position) => [
+          item.id,
+          position
+        ])
+      );
+
+      const regrouped = orderedChecklistItems(
+        current.map((item) => {
+          const position =
+            siblingPositionById.get(item.id);
+
+          return position === undefined
+            ? item
+            : {
+                ...item,
+                position
+              };
+        })
+      );
+
+      const positionedItems = regrouped.map(
         (item, position) => ({
           ...item,
           position
@@ -3744,8 +4124,36 @@ function MilestoneEditor({
     setNewChecklistText("");
     await onAddChecklistItem(
       milestone,
-      text
+      text,
+      null
     );
+  }
+
+  async function createEmptyChecklistItem(
+    parentId: number | null
+  ): Promise<void> {
+    if (parentId !== null) {
+      setCollapsedChecklistItemIds((current) => {
+        if (!current.has(parentId)) {
+          return current;
+        }
+
+        const next = new Set(current);
+        next.delete(parentId);
+        return next;
+      });
+    }
+
+    const createdItemId =
+      await onAddChecklistItem(
+        milestone,
+        "",
+        parentId
+      );
+
+    if (createdItemId !== 0) {
+      setEditingChecklistItemId(createdItemId);
+    }
   }
 
   return (
@@ -3976,12 +4384,35 @@ function MilestoneEditor({
               void saveChecklistOrder();
             }}
           >
-            {orderedChecklist.map((item) => (
+            {visibleChecklist.map((item) => {
+              const depth = checklistItemDepth(
+                item,
+                orderedChecklist
+              );
+
+              const hasSubtasks =
+                orderedChecklist.some(
+                  (candidate) =>
+                    candidate.parentId === item.id
+                );
+
+              const isCollapsed =
+                collapsedChecklistItemIds.has(
+                  item.id
+                );
+
+              const canAddSubtask =
+                depth < MAX_CHECKLIST_DEPTH;
+
+              return (
               <div
                 key={item.id}
                 draggable
                 className={[
                   "checklist-item",
+                  depth > 0
+                    ? "checklist-subtask"
+                    : "",
                   item.isDone
                     ? "checklist-item-complete"
                     : "",
@@ -3998,6 +4429,11 @@ function MilestoneEditor({
                 ]
                   .filter(Boolean)
                   .join(" ")}
+                style={
+                  {
+                    "--checklist-depth": depth
+                  } as React.CSSProperties
+                }
                 onDragStart={(event) => {
                   const target =
                     event.target as HTMLElement;
@@ -4039,6 +4475,21 @@ function MilestoneEditor({
                       null ||
                     draggedChecklistItemId ===
                       item.id
+                  ) {
+                    return;
+                  }
+
+                  const draggedItem =
+                    orderedChecklistRef.current.find(
+                      (candidate) =>
+                        candidate.id ===
+                        draggedChecklistItemId
+                    );
+
+                  if (
+                    !draggedItem ||
+                    draggedItem.parentId !==
+                      item.parentId
                   ) {
                     return;
                   }
@@ -4112,41 +4563,132 @@ function MilestoneEditor({
                     false;
                 }}
               >
-                <input
-                  type="checkbox"
-                  checked={item.isDone}
-                  aria-label={`Mark ${item.text} as complete`}
-                  onChange={(event) =>
-                    void onUpdateChecklistItem({
-                      id: item.id,
-                      isDone:
-                        event.target.checked
-                    })
-                  }
-                />
+                <div
+                  className={[
+                    "checklist-item-leading",
+                    hasSubtasks
+                      ? "checklist-item-leading-with-subtasks"
+                      : ""
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  <input
+                    type="checkbox"
+                    checked={item.isDone}
+                    aria-label={`Mark ${item.text || "task"} as complete`}
+                    onChange={(event) =>
+                      void onUpdateChecklistItem({
+                        id: item.id,
+                        isDone:
+                          event.target.checked
+                      })
+                    }
+                  />
+
+                  <button
+                    type="button"
+                    className={[
+                      "checklist-expand-button",
+                      isCollapsed
+                        ? "checklist-expand-button-collapsed"
+                        : "",
+                      !hasSubtasks
+                        ? "checklist-expand-button-hidden"
+                        : ""
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    aria-expanded={
+                      hasSubtasks
+                        ? !isCollapsed
+                        : undefined
+                    }
+                    aria-hidden={!hasSubtasks}
+                    aria-label={
+                      isCollapsed
+                        ? `Expand subtasks for ${item.text || "task"}`
+                        : `Collapse subtasks for ${item.text || "task"}`
+                    }
+                    disabled={!hasSubtasks}
+                    tabIndex={hasSubtasks ? 0 : -1}
+                    onClick={() =>
+                      setCollapsedChecklistItemIds(
+                        (current) => {
+                          const next = new Set(
+                            current
+                          );
+
+                          if (next.has(item.id)) {
+                            next.delete(item.id);
+                          } else {
+                            next.add(item.id);
+                          }
+
+                          return next;
+                        }
+                      )
+                    }
+                  >
+                    <svg
+                      viewBox="0 0 16 16"
+                      aria-hidden="true"
+                    >
+                      <path d="M5.5 3.5 10 8l-4.5 4.5" />
+                    </svg>
+                  </button>
+                </div>
 
                 <ChecklistTextEditor
                   item={item}
+                  autoFocus={
+                    editingChecklistItemId ===
+                    item.id
+                  }
                   onSave={
                     onUpdateChecklistItem
                   }
-                />
-
-                <button
-                  type="button"
-                  className="checklist-delete-button"
-                  title="Delete task"
-                  aria-label={`Delete ${item.text}`}
-                  onClick={() =>
-                    void onDeleteChecklistItem(
-                      item
+                  onCreateNext={() =>
+                    createEmptyChecklistItem(
+                      item.parentId
                     )
                   }
-                >
-                  ×
-                </button>
+                />
+
+                <div className="checklist-item-actions">
+                  <button
+                    type="button"
+                    className="checklist-delete-button"
+                    title="Delete task"
+                    aria-label={`Delete ${item.text || "task"}`}
+                    onClick={() =>
+                      void onDeleteChecklistItem(
+                        item
+                      )
+                    }
+                  >
+                    ×
+                  </button>
+
+                  {canAddSubtask && (
+                    <button
+                      type="button"
+                      className="checklist-subtask-button"
+                      title={`Add subtask (level ${depth + 1} of ${MAX_CHECKLIST_DEPTH})`}
+                      aria-label={`Add a subtask to ${item.text || "task"}`}
+                      onClick={() => {
+                        void createEmptyChecklistItem(
+                          item.id
+                        );
+                      }}
+                    >
+                      +
+                    </button>
+                  )}
+                </div>
               </div>
-            ))}
+              );
+            })}
           </div>
 
           <form

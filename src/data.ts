@@ -1,8 +1,11 @@
 import Database from "@tauri-apps/plugin-sql";
 
+export const MAX_CHECKLIST_DEPTH = 4;
+
 export interface ChecklistItem {
   id: number;
   milestoneId: number;
+  parentId: number | null;
   text: string;
   isDone: boolean;
   position: number;
@@ -67,6 +70,7 @@ interface MilestoneRow {
 interface ChecklistRow {
   id: number;
   milestoneId: number;
+  parentId: number | null;
   text: string;
   isDone: number;
   position: number;
@@ -126,6 +130,7 @@ export async function initializeDatabase(): Promise<void> {
       CREATE TABLE IF NOT EXISTS checklist_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         milestone_id INTEGER NOT NULL,
+        parent_id INTEGER,
         text TEXT NOT NULL,
         is_done INTEGER NOT NULL DEFAULT 0,
         position INTEGER NOT NULL DEFAULT 0,
@@ -133,6 +138,9 @@ export async function initializeDatabase(): Promise<void> {
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (milestone_id)
           REFERENCES milestones(id)
+          ON DELETE CASCADE,
+        FOREIGN KEY (parent_id)
+          REFERENCES checklist_items(id)
           ON DELETE CASCADE
       )
     `,
@@ -180,6 +188,25 @@ export async function initializeDatabase(): Promise<void> {
       ADD COLUMN emoji TEXT NOT NULL DEFAULT '📌'
     `);
   }
+
+  const checklistColumns = await db.select<
+    Array<{
+      name: string;
+    }>
+  >("PRAGMA table_info(checklist_items)");
+
+  const hasParentIdColumn = checklistColumns.some(
+    (column) => column.name === "parent_id"
+  );
+
+  if (!hasParentIdColumn) {
+    await db.execute(`
+      ALTER TABLE checklist_items
+      ADD COLUMN parent_id INTEGER
+        REFERENCES checklist_items(id)
+        ON DELETE CASCADE
+    `);
+  }
 }
 
 export async function loadSnapshot(): Promise<AppSnapshot> {
@@ -213,6 +240,7 @@ export async function loadSnapshot(): Promise<AppSnapshot> {
     SELECT
       id,
       milestone_id AS milestoneId,
+      parent_id AS parentId,
       text,
       is_done AS isDone,
       position
@@ -459,6 +487,7 @@ export async function deleteMilestone(
 
 export async function addChecklistItem(input: {
   milestoneId: number;
+  parentId?: number | null;
   text: string;
   position: number;
 }): Promise<number> {
@@ -468,14 +497,16 @@ export async function addChecklistItem(input: {
     `
       INSERT INTO checklist_items (
         milestone_id,
+        parent_id,
         text,
         is_done,
         position
       )
-      VALUES ($1, $2, 0, $3)
+      VALUES ($1, $2, $3, 0, $4)
     `,
     [
       input.milestoneId,
+      input.parentId ?? null,
       input.text,
       input.position
     ]
@@ -655,6 +686,18 @@ export function parseImportPayload(value: unknown): AppSnapshot {
       ) {
         throw new Error("The export contains an invalid milestone.");
       }
+
+      for (const item of milestone.checklist) {
+        if (
+          typeof item.id !== "number" ||
+          typeof item.text !== "string" ||
+          typeof item.isDone !== "boolean"
+        ) {
+          throw new Error(
+            "The export contains an invalid checklist item."
+          );
+        }
+      }
     }
   }
 
@@ -667,7 +710,73 @@ export function parseImportPayload(value: unknown): AppSnapshot {
           typeof project.emoji === "string" &&
           project.emoji.trim()
             ? project.emoji
-            : "📌"
+            : "📌",
+        milestones: project.milestones.map(
+          (milestone) => {
+            const parentByItemId = new Map(
+              milestone.checklist.map((item) => [
+                item.id,
+                typeof item.parentId === "number"
+                  ? item.parentId
+                  : null
+              ])
+            );
+
+            return {
+              ...milestone,
+              checklist: milestone.checklist.map(
+                (item) => {
+                  const requestedParentId =
+                    parentByItemId.get(item.id) ?? null;
+
+                  let depth = 0;
+                  let parentId = requestedParentId;
+                  let parentChainIsValid = true;
+                  const visitedIds = new Set<number>([
+                    item.id
+                  ]);
+
+                  while (parentId !== null) {
+                    if (
+                      !parentByItemId.has(parentId) ||
+                      visitedIds.has(parentId)
+                    ) {
+                      parentChainIsValid = false;
+                      parentId = null;
+                      break;
+                    }
+
+                    visitedIds.add(parentId);
+                    depth += 1;
+
+                    if (depth > MAX_CHECKLIST_DEPTH) {
+                      parentChainIsValid = false;
+                      parentId = null;
+                      break;
+                    }
+
+                    parentId =
+                      parentByItemId.get(parentId) ??
+                      null;
+                  }
+
+                  const parentIsValid =
+                    requestedParentId !== null &&
+                    parentChainIsValid &&
+                    depth > 0 &&
+                    depth <= MAX_CHECKLIST_DEPTH;
+
+                  return {
+                    ...item,
+                    parentId: parentIsValid
+                      ? requestedParentId
+                      : null
+                  };
+                }
+              )
+            };
+          }
+        )
       })
     )
   };
@@ -737,11 +846,12 @@ export async function replaceSnapshot(
             INSERT INTO checklist_items (
               id,
               milestone_id,
+              parent_id,
               text,
               is_done,
               position
             )
-            VALUES ($1, $2, $3, $4, $5)
+            VALUES ($1, $2, NULL, $3, $4, $5)
           `,
           [
             item.id,
@@ -750,6 +860,21 @@ export async function replaceSnapshot(
             item.isDone ? 1 : 0,
             item.position
           ]
+        );
+      }
+
+      for (const item of milestone.checklist) {
+        if (item.parentId === null) {
+          continue;
+        }
+
+        await db.execute(
+          `
+            UPDATE checklist_items
+            SET parent_id = $1
+            WHERE id = $2
+          `,
+          [item.parentId, item.id]
         );
       }
     }

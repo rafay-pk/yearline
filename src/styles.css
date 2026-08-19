@@ -96,7 +96,8 @@ body {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
@@ -106,7 +107,8 @@ button {
 
 button:focus-visible,
 input:focus-visible,
-textarea:focus-visible {
+textarea:focus-visible,
+select:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
@@ -352,20 +354,82 @@ textarea:focus-visible {
 .legend-project {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
   flex: 0 0 auto;
   min-height: 27px;
-  padding: 0 9px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: transparent;
-  cursor: pointer;
   font-size: 11px;
   font-weight: 650;
+  transition:
+    opacity 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease;
 }
 
 .legend-project:hover {
   background: var(--surface-hover);
+}
+
+.legend-project-selected {
+  border-color: var(--project-accent);
+  box-shadow:
+    0 0 0 1px var(--project-accent);
+}
+
+.legend-project-dimmed {
+  opacity: 0.42;
+}
+
+.legend-project-dimmed:hover,
+.legend-project-dimmed:focus-within {
+  opacity: 0.78;
+}
+
+.legend-project-visibility,
+.legend-project-details {
+  min-height: 25px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.legend-project-visibility {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  border-radius: 999px;
+}
+
+.legend-project-details {
+  max-width: 190px;
+  padding: 0 9px 0 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.legend-project-eye {
+  display: none;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.legend-project-visibility:hover .legend-emoji,
+.legend-project-visibility:focus-visible .legend-emoji,
+.legend-project-selected .legend-emoji {
+  display: none;
+}
+
+.legend-project-visibility:hover .legend-project-eye,
+.legend-project-visibility:focus-visible .legend-project-eye,
+.legend-project-selected .legend-project-eye {
+  display: inline;
 }
 
 .legend-color {
@@ -1090,7 +1154,7 @@ button:disabled {
     auto
     minmax(0, 1fr)
     auto;
-  align-items: start;
+  align-items: center;
   gap: 9px;
   min-width: 0;
   padding: 9px 10px;
@@ -1103,6 +1167,27 @@ button:disabled {
     transform 120ms ease,
     border-color 120ms ease,
     background 120ms ease;
+}
+
+.checklist-subtask {
+  position: relative;
+  margin-left:
+    calc(var(--checklist-depth) * 16px);
+  background:
+    color-mix(
+      in srgb,
+      var(--surface-muted) 72%,
+      var(--surface)
+    );
+}
+
+.checklist-subtask::before {
+  content: "↳";
+  position: absolute;
+  top: 8px;
+  left: -16px;
+  color: var(--text-muted);
+  font-size: 13px;
 }
 
 .checklist-item:active {
@@ -1129,9 +1214,82 @@ button:disabled {
     );
 }
 
-.checklist-item > input[type="checkbox"] {
-  margin-top: 5px;
+.checklist-item-leading {
+  display: grid;
+  grid-template-rows: 40px 0;
+  place-items: center;
+  align-self: center;
+  width: 22px;
+  min-width: 22px;
+  height: 40px;
+  margin: 1px 0 0;
+  transition: grid-template-rows 140ms ease;
+}
+
+.checklist-item-leading-with-subtasks {
+  grid-template-rows: 22px 18px;
+}
+
+.checklist-item-leading > input[type="checkbox"] {
+  margin: 0;
   cursor: pointer;
+}
+
+.checklist-expand-button {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  visibility: visible;
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease,
+    visibility 0s linear;
+}
+
+.checklist-expand-button:not(
+  .checklist-expand-button-hidden
+):hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.checklist-expand-button-hidden,
+.checklist-expand-button-hidden:disabled {
+  cursor: default;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px) scale(0.8);
+  visibility: hidden;
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease,
+    visibility 0s linear 140ms;
+}
+
+.checklist-expand-button svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transform: rotate(90deg);
+  transition: transform 120ms ease;
+}
+
+.checklist-expand-button-collapsed svg {
+  transform: rotate(0deg);
 }
 
 .checklist-drag-grip {
@@ -1152,6 +1310,7 @@ button:disabled {
 
 .checklist-textarea {
   display: block;
+  align-self: center;
   width: 100%;
   min-width: 0;
   min-height: 24px;
@@ -1202,7 +1361,7 @@ button:disabled {
   align-self: start;
   width: 22px;
   height: 22px;
-  margin: 1px -2px 0 -10px;
+  margin: 0;
   padding: 0;
   border: 0;
   border-radius: 6px;
@@ -1218,6 +1377,34 @@ button:disabled {
     opacity 120ms ease,
     color 120ms ease,
     background 120ms ease;
+}
+
+.checklist-subtask-button {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.checklist-subtask-button:hover {
+  background: var(--surface);
+  color: var(--primary);
+}
+
+.checklist-item-actions {
+  display: grid;
+  justify-items: center;
+  align-self: center;
+  margin: 1px -2px 0 0;
 }
 
 .checklist-delete-button:hover {
